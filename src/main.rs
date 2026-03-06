@@ -12,12 +12,12 @@ fn main() {
     }
 
     let file_path = std::path::Path::new(args.get(1).unwrap());
-    let result = parse_file(file_path);
-
-    if let Err(e) = result {
-        println!("Error: {}", e);
+    let packets = parse_packets(file_path).unwrap_or_else(|e| {
+        println!("Failed to parse packets: {}", e);
         process::exit(1);
-    }
+    });
+
+    println!("{:#?}", packets);
 }
 
 enum Par2Error {
@@ -118,7 +118,7 @@ const PAR2_PACKET_MAGIC_SLICE_CHECKSUM: &[u8] = b"PAR 2.0\0IFSC\0\0\0\0";
 const PAR2_PACKET_MAGIC_RECOVERY_SLICE: &[u8] = b"PAR 2.0\0RecvSlic";
 const PAR2_PACKET_MAGIC_CREATOR: &[u8] = b"PAR 2.0\0Creator\0";
 
-fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error> {
+fn parse_packets(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error> {
     let file_data = std::fs::read(file_path)?;
     let file_size = file_data.len();
     let mut offset = 0;
@@ -152,7 +152,7 @@ fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error>
                 }
 
                 println!(
-                    "Parsed header at [{}], {:?}",
+                    "Parsed header at [{}], length {}",
                     header_offset, header_packet_length
                 );
 
@@ -166,7 +166,11 @@ fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error>
                     ))
                 })?;
 
-                println!("Parsed body at [{}] {:#?}", body_offset, body);
+                println!(
+                    "Parsed body at [{}], length {}",
+                    body_offset,
+                    body_bytes.len()
+                );
 
                 packets.push(Par2Packet { header, body });
 
@@ -176,10 +180,6 @@ fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error>
             None => break,
         }
     }
-
-    println!("Parsed {} packets", packets.len());
-    println!("Total data size: {} bytes", file_size);
-    println!("Parsed bytes: {}", offset);
 
     Ok(packets)
 }
