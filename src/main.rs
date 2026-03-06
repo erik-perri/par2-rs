@@ -1,6 +1,8 @@
 use byteorder::{LittleEndian, ReadBytesExt};
+use glob::glob;
 use md5::{Digest, Md5};
 use std::io::{Cursor, Read};
+use std::path::{Path, PathBuf};
 use std::{env, process};
 
 fn main() {
@@ -11,11 +13,29 @@ fn main() {
         process::exit(1);
     }
 
-    let file_path = std::path::Path::new(args.get(1).unwrap());
-    let packets = parse_packets(file_path).unwrap_or_else(|e| {
-        println!("Failed to parse packets: {}", e);
+    let primary_file = Path::new(args.get(1).unwrap());
+    let file_paths = locate_files(primary_file).unwrap_or_else(|e| {
+        println!("Failed to locate files: {}", e);
         process::exit(1);
     });
+
+    let mut packets = Vec::new();
+
+    for file_path in file_paths {
+        println!("Parsing file: {}", file_path.display());
+
+        let parsed_packets = parse_packets(&file_path).unwrap_or_else(|e| {
+            println!(
+                "Failed to parse packets from {}: {}",
+                file_path.display(),
+                e
+            );
+
+            process::exit(1);
+        });
+
+        packets.extend(parsed_packets);
+    }
 
     let set = combine_set(packets).unwrap_or_else(|e| {
         println!("Failed to combine set: {}", e);
@@ -26,14 +46,15 @@ fn main() {
 }
 
 enum Par2Error {
-    Io(std::io::Error),
-    ParseError(String),
     DuplicateMainPacket,
+    FilePathError(String),
+    Io(std::io::Error),
     MissingComputedMD5,
     MissingFileDescriptions,
     MissingMainPacket,
     MissingRecoverySetId,
     MissingSliceChecksums,
+    ParseError(String),
 }
 
 impl From<std::io::Error> for Par2Error {
@@ -51,14 +72,15 @@ impl From<std::str::Utf8Error> for Par2Error {
 impl std::fmt::Display for Par2Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Par2Error::Io(err) => write!(f, "IO error: {}", err),
-            Par2Error::ParseError(message) => write!(f, "Parse error: {}", message),
             Par2Error::DuplicateMainPacket => write!(f, "Duplicate main packet"),
+            Par2Error::FilePathError(message) => write!(f, "File path error: {}", message),
+            Par2Error::Io(err) => write!(f, "IO error: {}", err),
             Par2Error::MissingComputedMD5 => write!(f, "Missing computed MD5"),
             Par2Error::MissingFileDescriptions => write!(f, "Missing file descriptions"),
             Par2Error::MissingMainPacket => write!(f, "Missing main packet"),
             Par2Error::MissingRecoverySetId => write!(f, "Missing recovery set ID"),
             Par2Error::MissingSliceChecksums => write!(f, "Missing slice checksums"),
+            Par2Error::ParseError(message) => write!(f, "Parse error: {}", message),
         }
     }
 }
@@ -84,8 +106,8 @@ struct Par2Packet {
 }
 
 type Par2FileId = [u8; 16];
-type Par2Md5Hash = [u8; 16];
 
+type Par2Md5Hash = [u8; 16];
 struct Par2PacketHeader {
     packet_length: u64,
     expected_md5: Par2Md5Hash,
@@ -160,12 +182,12 @@ struct Par2Set {
 }
 
 const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
+
 const PAR2_PACKET_MAGIC_MAIN: &[u8] = b"PAR 2.0\0Main\0\0\0\0";
 const PAR2_PACKET_MAGIC_FILE_DESC: &[u8] = b"PAR 2.0\0FileDesc";
 const PAR2_PACKET_MAGIC_SLICE_CHECKSUM: &[u8] = b"PAR 2.0\0IFSC\0\0\0\0";
 const PAR2_PACKET_MAGIC_RECOVERY_SLICE: &[u8] = b"PAR 2.0\0RecvSlic";
 const PAR2_PACKET_MAGIC_CREATOR: &[u8] = b"PAR 2.0\0Creator\0";
-
 fn parse_packets(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error> {
     let file_data = std::fs::read(file_path)?;
     let file_size = file_data.len();
@@ -538,4 +560,39 @@ fn combine_set(packets: Vec<Par2Packet>) -> Result<(Par2Set, Vec<Par2Warning>), 
         },
         warnings,
     ))
+}
+
+fn locate_files(base_file: &Path) -> Result<Vec<PathBuf>, Par2Error> {
+    let mut files = vec![base_file.to_path_buf()];
+
+    let parent_path = base_file
+        .parent()
+        .ok_or(Par2Error::FilePathError("Missing parent directory".into()))?;
+
+    let base_file_stem = base_file
+        .file_stem()
+        .ok_or(Par2Error::FilePathError("Missing file stem".into()))?
+        .to_str()
+        .ok_or(Par2Error::FilePathError(
+            "Unable to convert file stem to string".into(),
+        ))?;
+
+    let pattern_path = Path::join(parent_path, format!("{}.vol*.par2", base_file_stem));
+    let pattern = pattern_path.to_str().ok_or(Par2Error::FilePathError(
+        "Unable to convert pattern path to string".into(),
+    ))?;
+
+    let additional_files = glob(pattern).map_err(|e| {
+        Par2Error::FilePathError(format!("Failed to glob pattern '{}': {}", pattern, e))
+    })?;
+
+    for entry in additional_files {
+        let entry_path = entry
+            .map_err(|e| Par2Error::FilePathError(format!("{}", e)))?
+            .to_path_buf();
+
+        files.push(entry_path);
+    }
+
+    Ok(files)
 }
