@@ -63,13 +63,12 @@ struct Par2PacketHeader {
 #[derive(Debug)]
 enum Par2PacketBody {
     Main(Par2MainData),
-    FileDesc(Par2FileDescription),
-    SliceChecksum(Par2SliceChecksums),
-    RecoverySlice(Vec<u8>),
-    Creator(Vec<u8>),
+    FileDesc(Par2FileDescriptionData),
+    SliceChecksum(Par2SliceChecksumData),
+    RecoverySlice(Par2RecoverySliceData),
+    Creator(Par2CreatorData),
     Unknown(Vec<u8>),
 }
-
 
 const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
 const PAR2_PACKET_MAGIC_MAIN: &[u8] = b"PAR 2.0\0Main\0\0\0\0";
@@ -201,8 +200,8 @@ fn parse_body(packet_type: &[u8], data: &[u8]) -> Result<Par2PacketBody, Par2Err
         PAR2_PACKET_MAGIC_MAIN => parse_body_main(data),
         PAR2_PACKET_MAGIC_FILE_DESC => parse_file_description(data),
         PAR2_PACKET_MAGIC_SLICE_CHECKSUM => parse_slice_checksum(data),
-        PAR2_PACKET_MAGIC_RECOVERY_SLICE => Ok(Par2PacketBody::RecoverySlice(data.to_vec())),
-        PAR2_PACKET_MAGIC_CREATOR => Ok(Par2PacketBody::Creator(data.to_vec())),
+        PAR2_PACKET_MAGIC_RECOVERY_SLICE => parse_recovery_slice(data),
+        PAR2_PACKET_MAGIC_CREATOR => parse_creator(data),
         _ => Ok(Par2PacketBody::Unknown(data.to_vec())),
     }
 }
@@ -255,7 +254,7 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 }
 
 #[derive(Debug)]
-struct Par2FileDescription {
+struct Par2FileDescriptionData {
     file_id: Par2FileId,
     file_md5: Par2Md5Hash,
     file_first_16kb_md5: Par2Md5Hash,
@@ -277,22 +276,29 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file MD5: {}", e)))?;
 
     let mut file_first_16kb_md5 = [0; 16];
-    cursor
-        .read_exact(&mut file_first_16kb_md5)
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file first 16KB MD5: {}", e)))?;
+    cursor.read_exact(&mut file_first_16kb_md5).map_err(|e| {
+        Par2Error::ParseError(format!(
+            "Failed to read FileDesc file first 16KB MD5: {}",
+            e
+        ))
+    })?;
 
-    let file_length = cursor
-        .read_u64::<LittleEndian>()
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file length: {}", e)))?;
+    let file_length = cursor.read_u64::<LittleEndian>().map_err(|e| {
+        Par2Error::ParseError(format!("Failed to read FileDesc file length: {}", e))
+    })?;
 
     let mut file_name = vec![0; data.len() - cursor.position() as usize];
-    cursor.read_exact(&mut file_name)
+    cursor
+        .read_exact(&mut file_name)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file name: {}", e)))?;
 
-    let trailing_null_bytes = file_name.iter().rposition(|&b| b == 0).unwrap_or(file_name.len());
+    let trailing_null_bytes = file_name
+        .iter()
+        .rposition(|&b| b == 0)
+        .unwrap_or(file_name.len());
     file_name.truncate(trailing_null_bytes);
 
-    Ok(Par2PacketBody::FileDesc(Par2FileDescription {
+    Ok(Par2PacketBody::FileDesc(Par2FileDescriptionData {
         file_id,
         file_md5,
         file_first_16kb_md5,
@@ -302,13 +308,13 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 }
 
 #[derive(Debug)]
-struct Par2SliceChecksums {
+struct Par2SliceChecksumData {
     file_id: Par2FileId,
-    entries: Vec<Par2SliceChecksumsEntry>,
+    entries: Vec<Par2SliceChecksumEntry>,
 }
 
 #[derive(Debug)]
-struct Par2SliceChecksumsEntry {
+struct Par2SliceChecksumEntry {
     md5: Par2Md5Hash,
     crc32: u32,
 }
@@ -335,15 +341,58 @@ fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
             .read_exact(&mut md5)
             .map_err(|e| Par2Error::ParseError(format!("Failed to read IFSC entry MD5: {}", e)))?;
 
-        let crc32 = cursor
-            .read_u32::<LittleEndian>()
-            .map_err(|e| Par2Error::ParseError(format!("Failed to read IFSC entry CRC32: {}", e)))?;
+        let crc32 = cursor.read_u32::<LittleEndian>().map_err(|e| {
+            Par2Error::ParseError(format!("Failed to read IFSC entry CRC32: {}", e))
+        })?;
 
-        entries.push(Par2SliceChecksumsEntry { md5, crc32 });
+        entries.push(Par2SliceChecksumEntry { md5, crc32 });
     }
 
-    Ok(Par2PacketBody::SliceChecksum(Par2SliceChecksums {
+    Ok(Par2PacketBody::SliceChecksum(Par2SliceChecksumData {
         file_id,
         entries,
     }))
+}
+
+#[derive(Debug)]
+struct Par2RecoverySliceData {
+    exponent: u32,
+    recovery_data: Vec<u8>,
+}
+
+fn parse_recovery_slice(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
+    let mut cursor = Cursor::new(data);
+
+    let exponent = cursor.read_u32::<LittleEndian>().map_err(|e| {
+        Par2Error::ParseError(format!("Failed to read recovery slice exponent: {}", e))
+    })?;
+
+    let slice_size = cursor.get_ref().len() - cursor.position() as usize;
+    let mut recovery_data = Vec::with_capacity(slice_size);
+
+    cursor
+        .read_to_end(&mut recovery_data)
+        .map_err(|e| Par2Error::ParseError(format!("Failed to read recovery slice data: {}", e)))?;
+
+    Ok(Par2PacketBody::RecoverySlice(Par2RecoverySliceData {
+        exponent,
+        recovery_data,
+    }))
+}
+
+#[derive(Debug)]
+struct Par2CreatorData {
+    name: Vec<u8>,
+}
+
+fn parse_creator(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
+    let mut file_name = data.to_vec();
+
+    let trailing_null_bytes = file_name
+        .iter()
+        .rposition(|&b| b == 0)
+        .unwrap_or(file_name.len());
+    file_name.truncate(trailing_null_bytes);
+
+    Ok(Par2PacketBody::Creator(Par2CreatorData { name: file_name }))
 }
