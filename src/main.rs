@@ -70,6 +70,45 @@ enum Par2PacketBody {
     Unknown(Vec<u8>),
 }
 
+#[derive(Debug)]
+struct Par2MainData {
+    slice_size: u64,
+    file_count: u32,
+    file_ids: Vec<Par2FileId>,
+}
+
+#[derive(Debug)]
+struct Par2FileDescriptionData {
+    file_id: Par2FileId,
+    file_md5: Par2Md5Hash,
+    file_first_16kb_md5: Par2Md5Hash,
+    file_length: u64,
+    file_name: Vec<u8>, // ASCII bytes (not null-terminated, zero-padded to 4-byte alignment)
+}
+
+#[derive(Debug)]
+struct Par2SliceChecksumData {
+    file_id: Par2FileId,
+    entries: Vec<Par2SliceChecksumEntry>,
+}
+
+#[derive(Debug)]
+struct Par2SliceChecksumEntry {
+    md5: Par2Md5Hash,
+    crc32: u32,
+}
+
+#[derive(Debug)]
+struct Par2RecoverySliceData {
+    exponent: u32,
+    recovery_data: Vec<u8>,
+}
+
+#[derive(Debug)]
+struct Par2CreatorData {
+    name: Vec<u8>,
+}
+
 const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
 const PAR2_PACKET_MAGIC_MAIN: &[u8] = b"PAR 2.0\0Main\0\0\0\0";
 const PAR2_PACKET_MAGIC_FILE_DESC: &[u8] = b"PAR 2.0\0FileDesc";
@@ -206,13 +245,6 @@ fn parse_body(packet_type: &[u8], data: &[u8]) -> Result<Par2PacketBody, Par2Err
     }
 }
 
-#[derive(Debug)]
-struct Par2MainData {
-    slice_size: u64,
-    file_count: u32,
-    file_ids: Vec<Par2FileId>,
-}
-
 fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
@@ -251,15 +283,6 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         file_count,
         file_ids,
     }))
-}
-
-#[derive(Debug)]
-struct Par2FileDescriptionData {
-    file_id: Par2FileId,
-    file_md5: Par2Md5Hash,
-    file_first_16kb_md5: Par2Md5Hash,
-    file_length: u64,
-    file_name: Vec<u8>, // ASCII bytes (not null-terminated, zero-padded to 4-byte alignment)
 }
 
 fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
@@ -307,18 +330,6 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     }))
 }
 
-#[derive(Debug)]
-struct Par2SliceChecksumData {
-    file_id: Par2FileId,
-    entries: Vec<Par2SliceChecksumEntry>,
-}
-
-#[derive(Debug)]
-struct Par2SliceChecksumEntry {
-    md5: Par2Md5Hash,
-    crc32: u32,
-}
-
 fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
@@ -354,12 +365,6 @@ fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     }))
 }
 
-#[derive(Debug)]
-struct Par2RecoverySliceData {
-    exponent: u32,
-    recovery_data: Vec<u8>,
-}
-
 fn parse_recovery_slice(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
@@ -378,11 +383,6 @@ fn parse_recovery_slice(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         exponent,
         recovery_data,
     }))
-}
-
-#[derive(Debug)]
-struct Par2CreatorData {
-    name: Vec<u8>,
 }
 
 fn parse_creator(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
