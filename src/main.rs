@@ -1,4 +1,5 @@
 use byteorder::{LittleEndian, ReadBytesExt};
+use md5::{Digest, Md5};
 use std::io::{Cursor, Read};
 use std::{env, process};
 
@@ -55,7 +56,8 @@ type Par2Md5Hash = [u8; 16];
 
 struct Par2PacketHeader {
     packet_length: u64,
-    md5_hash: Par2Md5Hash,
+    expected_md5: Par2Md5Hash,
+    computed_md5: Option<Par2Md5Hash>,
     recovery_set_id: [u8; 16],
     packet_type: [u8; 16],
 }
@@ -127,12 +129,18 @@ fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error>
             Some(relative_offset) => {
                 let header_offset = offset + relative_offset;
 
-                let header = parse_header(&file_data[header_offset..]).map_err(|e| {
+                let mut header = parse_header(&file_data[header_offset..]).map_err(|e| {
                     Par2Error::ParseError(format!(
                         "Failed to parse header at offset [{}]: {}",
                         header_offset, e
                     ))
                 })?;
+
+                let mut hasher = Md5::new();
+                hasher.update(
+                    &file_data[header_offset + 32..header_offset + header.packet_length as usize],
+                );
+                header.computed_md5 = Some(hasher.finalize().into());
 
                 let header_packet_length = header.packet_length as usize;
 
@@ -211,9 +219,9 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
         .read_u64::<LittleEndian>()
         .map_err(|e| Par2Error::ParseError(format!("Failed to read packet length: {}", e)))?;
 
-    let mut md5_hash: [u8; 16] = [0; 16];
+    let mut expected_md5: [u8; 16] = [0; 16];
     cursor
-        .read_exact(&mut md5_hash)
+        .read_exact(&mut expected_md5)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read MD5: {}", e)))?;
 
     let mut recovery_set_id: [u8; 16] = [0; 16];
@@ -228,7 +236,8 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
 
     Ok(Par2PacketHeader {
         packet_length,
-        md5_hash,
+        expected_md5,
+        computed_md5: None,
         recovery_set_id,
         packet_type,
     })
