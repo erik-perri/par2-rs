@@ -75,7 +75,6 @@ enum Par2PacketBody {
 #[derive(Debug)]
 struct Par2MainData {
     slice_size: u64,
-    file_count: u32,
     file_ids: Vec<Par2FileId>,
 }
 
@@ -289,7 +288,6 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 
     Ok(Par2PacketBody::Main(Par2MainData {
         slice_size,
-        file_count,
         file_ids,
     }))
 }
