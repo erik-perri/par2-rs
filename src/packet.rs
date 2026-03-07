@@ -545,7 +545,7 @@ mod tests {
             let mut cursor = Cursor::new(Vec::new());
 
             cursor
-                .write_all(magic_bytes.unwrap_or(&PAR2_PACKET_MAGIC_HEADER))
+                .write_all(magic_bytes.unwrap_or(PAR2_PACKET_MAGIC_HEADER))
                 .unwrap();
             cursor.write_u64::<LittleEndian>(packet_length).unwrap();
             cursor.write_all(expected_md5.as_ref()).unwrap();
