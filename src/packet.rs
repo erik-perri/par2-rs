@@ -33,12 +33,6 @@ impl AsRef<[u8]> for Par2Md5Hash {
     }
 }
 
-impl From<[u8; 16]> for Par2Md5Hash {
-    fn from(bytes: [u8; 16]) -> Self {
-        Par2Md5Hash(bytes)
-    }
-}
-
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct Par2RecoverySetId([u8; 16]);
 
