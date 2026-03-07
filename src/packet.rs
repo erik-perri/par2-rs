@@ -204,24 +204,6 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
     Ok(packets)
 }
 
-fn find_next_header_offset(data: &[u8]) -> Option<usize> {
-    let mut offset = 0;
-    let total_size = data.len();
-    let magic_size = PAR2_PACKET_MAGIC_HEADER.len();
-
-    while offset + magic_size <= total_size {
-        let magic_bytes = &data[offset..offset + magic_size];
-
-        if magic_bytes == PAR2_PACKET_MAGIC_HEADER {
-            return Some(offset);
-        }
-
-        offset += 1;
-    }
-
-    None
-}
-
 fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
     let mut cursor = Cursor::new(data);
 
@@ -438,6 +420,24 @@ fn parse_creator(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     Ok(Par2PacketBody::Creator(Par2CreatorData { name }))
 }
 
+fn find_next_header_offset(data: &[u8]) -> Option<usize> {
+    let mut offset = 0;
+    let total_size = data.len();
+    let magic_size = PAR2_PACKET_MAGIC_HEADER.len();
+
+    while offset + magic_size <= total_size {
+        let magic_bytes = &data[offset..offset + magic_size];
+
+        if magic_bytes == PAR2_PACKET_MAGIC_HEADER {
+            return Some(offset);
+        }
+
+        offset += 1;
+    }
+
+    None
+}
+
 fn trim_trailing_null_bytes(data: &[u8]) -> Vec<u8> {
     let last_non_null_byte = data.iter().rposition(|&b| b != 0);
 
@@ -451,84 +451,6 @@ fn trim_trailing_null_bytes(data: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    mod find_next_header_offset {
-        use super::*;
-
-        #[test]
-        fn magic_bytes_at_start() {
-            assert_eq!(find_next_header_offset(PAR2_PACKET_MAGIC_HEADER), Some(0));
-        }
-
-        #[test]
-        fn magic_bytes_at_end() {
-            let mut data = vec![0x10, 0x11, 0x12];
-            data.extend_from_slice(PAR2_PACKET_MAGIC_HEADER);
-            assert_eq!(find_next_header_offset(&data), Some(3));
-        }
-
-        #[test]
-        fn multiple_returns_first() {
-            let mut data = vec![0x10, 0x11];
-            data.extend_from_slice(PAR2_PACKET_MAGIC_HEADER);
-            data.extend_from_slice(&[0x12]);
-            data.extend_from_slice(PAR2_PACKET_MAGIC_HEADER);
-            assert_eq!(find_next_header_offset(&data), Some(2));
-        }
-
-        #[test]
-        fn no_magic_returns_none() {
-            assert_eq!(find_next_header_offset(b"PAR3\0PKT"), None);
-        }
-
-        #[test]
-        fn half_magic_returns_none() {
-            assert_eq!(
-                find_next_header_offset(&PAR2_PACKET_MAGIC_HEADER[0..4]),
-                None
-            );
-        }
-
-        #[test]
-        fn empty_data_returns_none() {
-            assert_eq!(find_next_header_offset(&[]), None);
-        }
-    }
-
-    mod trim_trailing_null_bytes {
-        use super::*;
-
-        #[test]
-        fn empty_input() {
-            assert_eq!(trim_trailing_null_bytes(&[]), Vec::new());
-        }
-
-        #[test]
-        fn all_null_bytes() {
-            assert_eq!(trim_trailing_null_bytes(&[0; 5]), Vec::new());
-        }
-
-        #[test]
-        fn no_null_bytes() {
-            assert_eq!(
-                trim_trailing_null_bytes(&[0x10, 0x11, 0x12]),
-                vec![0x10, 0x11, 0x12]
-            );
-        }
-
-        #[test]
-        fn only_trailing_null_bytes() {
-            assert_eq!(
-                trim_trailing_null_bytes(&[0x10, 0, 0x12, 0x13, 0, 0]),
-                vec![0x10, 0, 0x12, 0x13]
-            );
-        }
-
-        #[test]
-        fn single_byte_with_trailing() {
-            assert_eq!(trim_trailing_null_bytes(&[0x41, 0x00, 0x00]), vec![0x41]);
-        }
-    }
 
     mod parse_header {
         use super::*;
@@ -668,6 +590,84 @@ mod tests {
             );
 
             assert!(parse_header(&header_bytes).is_err());
+        }
+    }
+
+    mod find_next_header_offset {
+        use super::*;
+
+        #[test]
+        fn magic_bytes_at_start() {
+            assert_eq!(find_next_header_offset(PAR2_PACKET_MAGIC_HEADER), Some(0));
+        }
+
+        #[test]
+        fn magic_bytes_at_end() {
+            let mut data = vec![0x10, 0x11, 0x12];
+            data.extend_from_slice(PAR2_PACKET_MAGIC_HEADER);
+            assert_eq!(find_next_header_offset(&data), Some(3));
+        }
+
+        #[test]
+        fn multiple_returns_first() {
+            let mut data = vec![0x10, 0x11];
+            data.extend_from_slice(PAR2_PACKET_MAGIC_HEADER);
+            data.extend_from_slice(&[0x12]);
+            data.extend_from_slice(PAR2_PACKET_MAGIC_HEADER);
+            assert_eq!(find_next_header_offset(&data), Some(2));
+        }
+
+        #[test]
+        fn no_magic_returns_none() {
+            assert_eq!(find_next_header_offset(b"PAR3\0PKT"), None);
+        }
+
+        #[test]
+        fn half_magic_returns_none() {
+            assert_eq!(
+                find_next_header_offset(&PAR2_PACKET_MAGIC_HEADER[0..4]),
+                None
+            );
+        }
+
+        #[test]
+        fn empty_data_returns_none() {
+            assert_eq!(find_next_header_offset(&[]), None);
+        }
+    }
+
+    mod trim_trailing_null_bytes {
+        use super::*;
+
+        #[test]
+        fn empty_input() {
+            assert_eq!(trim_trailing_null_bytes(&[]), Vec::new());
+        }
+
+        #[test]
+        fn all_null_bytes() {
+            assert_eq!(trim_trailing_null_bytes(&[0; 5]), Vec::new());
+        }
+
+        #[test]
+        fn no_null_bytes() {
+            assert_eq!(
+                trim_trailing_null_bytes(&[0x10, 0x11, 0x12]),
+                vec![0x10, 0x11, 0x12]
+            );
+        }
+
+        #[test]
+        fn only_trailing_null_bytes() {
+            assert_eq!(
+                trim_trailing_null_bytes(&[0x10, 0, 0x12, 0x13, 0, 0]),
+                vec![0x10, 0, 0x12, 0x13]
+            );
+        }
+
+        #[test]
+        fn single_byte_with_trailing() {
+            assert_eq!(trim_trailing_null_bytes(&[0x41, 0x00, 0x00]), vec![0x41]);
         }
     }
 }
