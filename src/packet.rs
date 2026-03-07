@@ -475,63 +475,27 @@ mod tests {
         fn parses_header() {
             let header_bytes = build_header_bytes(
                 1234,
-                Par2Md5Hash([
-                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-                    0xAA, 0xAA, 0xAA,
-                ]),
-                Par2RecoverySetId([
-                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-                    0xBB, 0xBB, 0xBB,
-                ]),
-                [
-                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-                    0xCC, 0xCC, 0xCC,
-                ],
+                Par2Md5Hash([0xAA; 16]),
+                Par2RecoverySetId([0xBB; 16]),
+                [0xCC; 16],
                 None,
             );
 
             let parsed_header = parse_header(&header_bytes).unwrap();
 
             assert_eq!(parsed_header.packet_length, 1234);
-            assert_eq!(
-                parsed_header.expected_md5,
-                Par2Md5Hash([
-                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-                    0xAA, 0xAA, 0xAA,
-                ])
-            );
-            assert_eq!(
-                parsed_header.recovery_set_id,
-                Par2RecoverySetId([
-                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-                    0xBB, 0xBB, 0xBB,
-                ])
-            );
-            assert_eq!(
-                parsed_header.packet_type,
-                [
-                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-                    0xCC, 0xCC, 0xCC,
-                ]
-            );
+            assert_eq!(parsed_header.expected_md5, Par2Md5Hash([0xAA; 16]));
+            assert_eq!(parsed_header.recovery_set_id, Par2RecoverySetId([0xBB; 16]));
+            assert_eq!(parsed_header.packet_type, [0xCC; 16]);
         }
 
         #[test]
         fn truncated_below_magic_bytes() {
             let header_bytes = build_header_bytes(
                 1234,
-                Par2Md5Hash([
-                    0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD,
-                    0xDD, 0xDD, 0xDD,
-                ]),
-                Par2RecoverySetId([
-                    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-                    0xEE, 0xEE, 0xEE,
-                ]),
-                [
-                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                    0xFF, 0xFF, 0xFF,
-                ],
+                Par2Md5Hash([0xDD; 16]),
+                Par2RecoverySetId([0xEE; 16]),
+                [0xFF; 16],
                 None,
             );
 
@@ -544,18 +508,9 @@ mod tests {
         fn truncated_after_magic_bytes() {
             let header_bytes = build_header_bytes(
                 1234,
-                Par2Md5Hash([
-                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
-                    0xFF, 0xFF, 0xFF,
-                ]),
-                Par2RecoverySetId([
-                    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
-                    0xEE, 0xEE, 0xEE,
-                ]),
-                [
-                    0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD,
-                    0xDD, 0xDD, 0xDD,
-                ],
+                Par2Md5Hash([0xFF; 16]),
+                Par2RecoverySetId([0xEE; 16]),
+                [0xDD; 16],
                 None,
             );
 
@@ -568,18 +523,9 @@ mod tests {
         fn invalid_magic_bytes() {
             let header_bytes = build_header_bytes(
                 1234,
-                Par2Md5Hash([
-                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-                    0xAA, 0xAA, 0xAA,
-                ]),
-                Par2RecoverySetId([
-                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-                    0xBB, 0xBB, 0xBB,
-                ]),
-                [
-                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-                    0xCC, 0xCC, 0xCC,
-                ],
+                Par2Md5Hash([0xAA; 16]),
+                Par2RecoverySetId([0xBB; 16]),
+                [0xCC; 16],
                 Some(b"INVALID\0"),
             );
 
@@ -619,16 +565,7 @@ mod tests {
         fn normal_body() {
             let body_bytes = build_body_main_bytes(
                 1234,
-                &[
-                    Par2FileId([
-                        0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-                        0xAA, 0xAA, 0xAA, 0xAA,
-                    ]),
-                    Par2FileId([
-                        0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-                        0xBB, 0xBB, 0xBB, 0xBB,
-                    ]),
-                ],
+                &[Par2FileId([0xAA; 16]), Par2FileId([0xBB; 16])],
                 &[],
                 None,
             );
@@ -640,35 +577,15 @@ mod tests {
 
             assert_eq!(main_data.slice_size, 1234);
             assert_eq!(main_data.recovery_file_ids.len(), 2);
-            assert_eq!(
-                main_data.recovery_file_ids[0],
-                Par2FileId([
-                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
-                    0xAA, 0xAA, 0xAA,
-                ])
-            );
-            assert_eq!(
-                main_data.recovery_file_ids[1],
-                Par2FileId([
-                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-                    0xBB, 0xBB, 0xBB,
-                ])
-            );
+            assert_eq!(main_data.recovery_file_ids[0], Par2FileId([0xAA; 16]));
+            assert_eq!(main_data.recovery_file_ids[1], Par2FileId([0xBB; 16]));
 
             assert_eq!(main_data.non_recovery_file_ids.len(), 0);
         }
 
         #[test]
         fn non_recovery_files() {
-            let body_bytes = build_body_main_bytes(
-                1234,
-                &[],
-                &[Par2FileId([
-                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-                    0xCC, 0xCC, 0xCC,
-                ])],
-                None,
-            );
+            let body_bytes = build_body_main_bytes(1234, &[], &[Par2FileId([0xCC; 16])], None);
 
             let parsed_body = parse_body_main(&body_bytes).unwrap();
             let Par2PacketBody::Main(main_data) = parsed_body else {
@@ -680,13 +597,7 @@ mod tests {
             assert_eq!(main_data.recovery_file_ids.len(), 0);
 
             assert_eq!(main_data.non_recovery_file_ids.len(), 1);
-            assert_eq!(
-                main_data.non_recovery_file_ids[0],
-                Par2FileId([
-                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-                    0xCC, 0xCC, 0xCC,
-                ]),
-            )
+            assert_eq!(main_data.non_recovery_file_ids[0], Par2FileId([0xCC; 16]),)
         }
 
         #[test]
@@ -700,14 +611,8 @@ mod tests {
         fn unexpected_size() {
             let body_bytes = build_body_main_bytes(
                 1234,
-                &[Par2FileId([
-                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-                    0xCC, 0xCC, 0xCC,
-                ])],
-                &[Par2FileId([
-                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
-                    0xBB, 0xBB, 0xBB,
-                ])],
+                &[Par2FileId([0xCC; 16])],
+                &[Par2FileId([0xBB; 16])],
                 None,
             );
             let truncated = &body_bytes[0..body_bytes.len() - 4];
