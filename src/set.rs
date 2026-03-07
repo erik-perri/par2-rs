@@ -6,6 +6,7 @@ use crate::packet::{
 
 #[derive(Debug)]
 struct Parsed<T> {
+    recovery_set_id: Par2RecoverySetId,
     expected_md5: Par2Md5Hash,
     computed_md5: Par2Md5Hash,
     data: T,
@@ -65,27 +66,32 @@ impl Par2PotentialSet {
                     recovery_set_id = Some(packet.header.recovery_set_id);
 
                     main = Some(Parsed {
+                        recovery_set_id: packet.header.recovery_set_id,
                         expected_md5: packet.header.expected_md5,
                         computed_md5,
                         data,
                     });
                 }
                 Par2PacketBody::FileDesc(data) => file_descriptions.push(Parsed {
+                    recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
                     computed_md5,
                     data,
                 }),
                 Par2PacketBody::SliceChecksum(data) => slice_checksums.push(Parsed {
+                    recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
                     computed_md5,
                     data,
                 }),
                 Par2PacketBody::RecoverySlice(data) => recovery_slices.push(Parsed {
+                    recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
                     computed_md5,
                     data,
                 }),
                 Par2PacketBody::Creator(data) => creators.push(Parsed {
+                    recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
                     computed_md5,
                     data,
@@ -126,27 +132,34 @@ impl Par2PotentialSet {
 
         let mut warnings = self.warnings;
 
-        let valid_file_descriptions = validate_hashes(
+        let valid_file_descriptions = validate_and_filter(
             Par2WarningDataType::FileDescription,
             self.file_descriptions,
+            self.recovery_set_id,
             &mut warnings,
         );
 
-        let valid_slice_checksums = validate_hashes(
+        let valid_slice_checksums = validate_and_filter(
             Par2WarningDataType::SliceChecksum,
             self.slice_checksums,
+            self.recovery_set_id,
             &mut warnings,
         );
 
         let had_recovery_slices = !self.recovery_slices.is_empty();
-        let valid_recovery_slices = validate_hashes(
+        let valid_recovery_slices = validate_and_filter(
             Par2WarningDataType::RecoverySlice,
             self.recovery_slices,
+            self.recovery_set_id,
             &mut warnings,
         );
 
-        let valid_creators =
-            validate_hashes(Par2WarningDataType::Creator, self.creators, &mut warnings);
+        let valid_creators = validate_and_filter(
+            Par2WarningDataType::Creator,
+            self.creators,
+            self.recovery_set_id,
+            &mut warnings,
+        );
 
         if valid_recovery_slices.is_empty() && had_recovery_slices {
             warnings.push(Par2Warning::AllRecoverySlicesCorrupt);
@@ -172,14 +185,24 @@ impl Par2PotentialSet {
     }
 }
 
-fn validate_hashes<T>(
+fn validate_and_filter<T>(
     data_type: Par2WarningDataType,
     data: Vec<Parsed<T>>,
+    recovery_set_id: Par2RecoverySetId,
     warnings: &mut Vec<Par2Warning>,
 ) -> Vec<T> {
     let mut valid_data = Vec::new();
 
     for parsed_data in data {
+        if parsed_data.recovery_set_id != recovery_set_id {
+            warnings.push(Par2Warning::UnexpectedRecoverySetId(
+                data_type,
+                recovery_set_id,
+                parsed_data.recovery_set_id,
+            ));
+            continue;
+        }
+
         if parsed_data.computed_md5 != parsed_data.expected_md5 {
             warnings.push(Par2Warning::IntegrityFailure(
                 data_type,
