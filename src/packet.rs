@@ -88,70 +88,68 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
     let mut packets = Vec::new();
 
     while offset < file_size {
-        match find_next_header_offset(&file_data[offset..]) {
-            Some(relative_offset) => {
-                let header_offset = offset + relative_offset;
+        let Some(relative_offset) = find_next_header_offset(&file_data[offset..]) else {
+            break;
+        };
 
-                let mut header = parse_header(&file_data[header_offset..]).map_err(|e| {
-                    Par2Error::ParseError(format!(
-                        "Failed to parse header at offset [{}]: {}",
-                        header_offset, e
-                    ))
-                })?;
+        let header_offset = offset + relative_offset;
 
-                // The packet length must be large enough to contain the entire header.
-                if header.packet_length < PAR2_HEADER_SIZE as u64 {
-                    return Err(Par2Error::ParseError(format!(
-                        "Header packet length [{}] is less than minimum required [{}]",
-                        header.packet_length, PAR2_HEADER_SIZE,
-                    )));
-                }
+        let mut header = parse_header(&file_data[header_offset..]).map_err(|e| {
+            Par2Error::ParseError(format!(
+                "Failed to parse header at offset [{}]: {}",
+                header_offset, e
+            ))
+        })?;
 
-                let header_hash_start_position = header_offset + PAR2_HASH_START_OFFSET;
-                let header_hash_end_position =
-                    header_offset.saturating_add(header.packet_length as usize);
-
-                if header_hash_end_position > file_size {
-                    return Err(Par2Error::ParseError(format!(
-                        "Header hash end position [{}] exceeds file size [{}]",
-                        header_hash_end_position, file_size
-                    )));
-                }
-
-                let mut hasher = Md5::new();
-                hasher.update(&file_data[header_hash_start_position..header_hash_end_position]);
-                header.computed_md5 = Some(hasher.finalize().into());
-
-                let header_packet_length = header.packet_length as usize;
-
-                println!(
-                    "Parsed header at [{}], length {}",
-                    header_offset, header_packet_length
-                );
-
-                let body_offset = header_offset + PAR2_HEADER_SIZE;
-                let body_bytes = &file_data[body_offset..header_offset + header_packet_length];
-
-                let body = parse_body(&header.packet_type, body_bytes).map_err(|e| {
-                    Par2Error::ParseError(format!(
-                        "Failed to parse body at offset [{}]: {}",
-                        header_offset, e
-                    ))
-                })?;
-
-                println!(
-                    "Parsed body at [{}], length {}",
-                    body_offset,
-                    body_bytes.len()
-                );
-
-                packets.push(Par2Packet { header, body });
-
-                // Move to the next packet
-                offset = header_offset + header_packet_length;
-            }
-            None => break,
+        // The packet length must be large enough to contain the entire header.
+        if header.packet_length < PAR2_HEADER_SIZE as u64 {
+            return Err(Par2Error::ParseError(format!(
+                "Header packet length [{}] is less than minimum required [{}]",
+                header.packet_length, PAR2_HEADER_SIZE,
+            )));
         }
+
+        let header_hash_start_position = header_offset + PAR2_HASH_START_OFFSET;
+        let header_hash_end_position = header_offset.saturating_add(header.packet_length as usize);
+
+        if header_hash_end_position > file_size {
+            return Err(Par2Error::ParseError(format!(
+                "Header hash end position [{}] exceeds file size [{}]",
+                header_hash_end_position, file_size
+            )));
+        }
+
+        let mut hasher = Md5::new();
+        hasher.update(&file_data[header_hash_start_position..header_hash_end_position]);
+        header.computed_md5 = Some(hasher.finalize().into());
+
+        let header_packet_length = header.packet_length as usize;
+
+        println!(
+            "Parsed header at [{}], length {}",
+            header_offset, header_packet_length
+        );
+
+        let body_offset = header_offset + PAR2_HEADER_SIZE;
+        let body_bytes = &file_data[body_offset..header_offset + header_packet_length];
+
+        let body = parse_body(&header.packet_type, body_bytes).map_err(|e| {
+            Par2Error::ParseError(format!(
+                "Failed to parse body at offset [{}]: {}",
+                header_offset, e
+            ))
+        })?;
+
+        println!(
+            "Parsed body at [{}], length {}",
+            body_offset,
+            body_bytes.len()
+        );
+
+        packets.push(Par2Packet { header, body });
+
+        // Move to the next packet
+        offset = header_offset + header_packet_length;
     }
 
     Ok(packets)
