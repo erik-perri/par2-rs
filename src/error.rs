@@ -5,7 +5,7 @@ pub enum Par2Error {
     AllSliceChecksumsCorrupt,
     FilePathError(String),
     Io(std::io::Error),
-    MainPacketDuplicate,
+    MainPacketConflict,
     MainPacketIntegrityFailure,
     MissingComputedMD5,
     MissingFileDescriptions,
@@ -34,7 +34,9 @@ impl std::fmt::Display for Par2Error {
             Par2Error::AllSliceChecksumsCorrupt => write!(f, "All slice checksums are corrupt"),
             Par2Error::FilePathError(message) => write!(f, "File path error: {}", message),
             Par2Error::Io(err) => write!(f, "IO error: {}", err),
-            Par2Error::MainPacketDuplicate => write!(f, "Duplicate main packet"),
+            Par2Error::MainPacketConflict => {
+                write!(f, "A conflicting main packet was found")
+            }
             Par2Error::MainPacketIntegrityFailure => write!(f, "Main packet integrity failure"),
             Par2Error::MissingComputedMD5 => write!(f, "Missing computed MD5"),
             Par2Error::MissingFileDescriptions => write!(f, "Missing file descriptions"),

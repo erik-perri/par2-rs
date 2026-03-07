@@ -57,7 +57,7 @@ impl Par2PotentialSet {
                             || main.computed_md5 != computed_md5
                             || packet.header.recovery_set_id != recovery_set_id.unwrap()
                         {
-                            return Err(Par2Error::MainPacketDuplicate);
+                            return Err(Par2Error::MainPacketConflict);
                         }
 
                         continue;
