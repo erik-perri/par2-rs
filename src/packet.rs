@@ -3,11 +3,13 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use md5::{Digest, Md5};
 use std::io::{Cursor, Read};
 
-pub type Par2RecoverySetId = [u8; 16];
-
 pub type Par2FileId = [u8; 16];
 
 pub type Par2Md5Hash = [u8; 16];
+
+pub type Par2PacketType = [u8; 16];
+
+pub type Par2RecoverySetId = [u8; 16];
 
 pub struct Par2Packet {
     pub header: Par2PacketHeader,
@@ -19,7 +21,7 @@ pub struct Par2PacketHeader {
     pub expected_md5: Par2Md5Hash,
     pub computed_md5: Option<Par2Md5Hash>,
     pub recovery_set_id: Par2RecoverySetId,
-    packet_type: [u8; 16],
+    packet_type: Par2PacketType,
 }
 
 #[derive(Debug)]
@@ -29,7 +31,7 @@ pub enum Par2PacketBody {
     SliceChecksum(Par2SliceChecksumData),
     RecoverySlice(Par2RecoverySliceData),
     Creator(Par2CreatorData),
-    Unknown(Vec<u8>),
+    Unknown(Par2PacketType),
 }
 
 #[derive(Debug)]
@@ -72,11 +74,11 @@ pub struct Par2CreatorData {
 }
 
 pub const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
-pub const PAR2_PACKET_MAGIC_MAIN: &[u8] = b"PAR 2.0\0Main\0\0\0\0";
-pub const PAR2_PACKET_MAGIC_FILE_DESC: &[u8] = b"PAR 2.0\0FileDesc";
-pub const PAR2_PACKET_MAGIC_SLICE_CHECKSUM: &[u8] = b"PAR 2.0\0IFSC\0\0\0\0";
-pub const PAR2_PACKET_MAGIC_RECOVERY_SLICE: &[u8] = b"PAR 2.0\0RecvSlic";
-pub const PAR2_PACKET_MAGIC_CREATOR: &[u8] = b"PAR 2.0\0Creator\0";
+pub const PAR2_PACKET_MAGIC_MAIN: &Par2PacketType = b"PAR 2.0\0Main\0\0\0\0";
+pub const PAR2_PACKET_MAGIC_FILE_DESC: &Par2PacketType = b"PAR 2.0\0FileDesc";
+pub const PAR2_PACKET_MAGIC_SLICE_CHECKSUM: &Par2PacketType = b"PAR 2.0\0IFSC\0\0\0\0";
+pub const PAR2_PACKET_MAGIC_RECOVERY_SLICE: &Par2PacketType = b"PAR 2.0\0RecvSlic";
+pub const PAR2_PACKET_MAGIC_CREATOR: &Par2PacketType = b"PAR 2.0\0Creator\0";
 
 const PAR2_HEADER_SIZE: usize = 64;
 const PAR2_HASH_START_OFFSET: usize = 32;
@@ -190,17 +192,17 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
         .read_u64::<LittleEndian>()
         .map_err(|e| Par2Error::ParseError(format!("Failed to read packet length: {}", e)))?;
 
-    let mut expected_md5: [u8; 16] = [0; 16];
+    let mut expected_md5: Par2Md5Hash = [0; 16];
     cursor
         .read_exact(&mut expected_md5)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read MD5: {}", e)))?;
 
-    let mut recovery_set_id: [u8; 16] = [0; 16];
+    let mut recovery_set_id: Par2RecoverySetId = [0; 16];
     cursor
         .read_exact(&mut recovery_set_id)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read recovery set ID: {}", e)))?;
 
-    let mut packet_type: [u8; 16] = [0; 16];
+    let mut packet_type: Par2PacketType = [0; 16];
     cursor
         .read_exact(&mut packet_type)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read packet type: {}", e)))?;
@@ -214,14 +216,14 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
     })
 }
 
-fn parse_body(packet_type: &[u8], data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
+fn parse_body(packet_type: &Par2PacketType, data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     match packet_type {
         PAR2_PACKET_MAGIC_MAIN => parse_body_main(data),
         PAR2_PACKET_MAGIC_FILE_DESC => parse_file_description(data),
         PAR2_PACKET_MAGIC_SLICE_CHECKSUM => parse_slice_checksum(data),
         PAR2_PACKET_MAGIC_RECOVERY_SLICE => parse_recovery_slice(data),
         PAR2_PACKET_MAGIC_CREATOR => parse_creator(data),
-        _ => Ok(Par2PacketBody::Unknown(data.to_vec())),
+        _ => Ok(Par2PacketBody::Unknown(packet_type.clone())),
     }
 }
 

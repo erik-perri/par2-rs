@@ -96,8 +96,8 @@ impl Par2PotentialSet {
                     computed_md5,
                     data,
                 }),
-                Par2PacketBody::Unknown(_) => {
-                    warnings.push(Par2Warning::UnknownPacketType);
+                Par2PacketBody::Unknown(packet_type) => {
+                    warnings.push(Par2Warning::UnknownPacketType(packet_type));
                 }
             }
         }

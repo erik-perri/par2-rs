@@ -1,4 +1,4 @@
-use crate::packet::{Par2Md5Hash, Par2RecoverySetId};
+use crate::packet::{Par2Md5Hash, Par2PacketType, Par2RecoverySetId};
 
 pub enum Par2Error {
     AllFileDescriptionsCorrupt,
@@ -73,7 +73,7 @@ pub enum Par2Warning {
     MissingCreator,
     IntegrityFailure(Par2WarningDataType, Par2Md5Hash, Par2Md5Hash),
     UnexpectedRecoverySetId(Par2WarningDataType, Par2RecoverySetId, Par2RecoverySetId),
-    UnknownPacketType,
+    UnknownPacketType(Par2PacketType),
 }
 
 impl std::fmt::Display for Par2Warning {
@@ -99,7 +99,9 @@ impl std::fmt::Display for Par2Warning {
                     hex::encode(actual)
                 )
             }
-            Par2Warning::UnknownPacketType => write!(f, "Unknown packet type"),
+            Par2Warning::UnknownPacketType(packet_type) => {
+                write!(f, "Unknown packet type {}", hex::encode(packet_type))
+            }
         }
     }
 }
