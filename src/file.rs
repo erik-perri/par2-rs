@@ -23,7 +23,8 @@ pub fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
             "Unable to convert file stem to string".into(),
         ))?;
 
-    let pattern_path = Path::join(parent_path, format!("{}.vol*.par2", base_file_stem));
+    let escaped_stem = glob::Pattern::escape(base_file_stem);
+    let pattern_path = Path::join(parent_path, format!("{}.vol*.par2", escaped_stem));
     let pattern = pattern_path.to_str().ok_or(Par2Error::FilePathError(
         "Unable to convert pattern path to string".into(),
     ))?;
@@ -88,5 +89,36 @@ mod tests {
         let result = locate_files(&nonexistent);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn with_special_glob_characters_in_filename() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // When unescaped, the glob turns `[2024]` into `0|2|4` and no longer matches.
+        File::create(temp_dir.path().join("backup[2024].par2")).unwrap();
+        File::create(temp_dir.path().join("backup[2024].vol000+01.par2")).unwrap();
+
+        let result = locate_files(&temp_dir.path().join("backup[2024].par2")).unwrap();
+
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0], temp_dir.path().join("backup[2024].par2"));
+        assert_eq!(
+            result[1],
+            temp_dir.path().join("backup[2024].vol000+01.par2")
+        );
+    }
+
+    #[test]
+    fn with_invalid_glob_characters_in_filename() {
+        let temp_dir = TempDir::new().unwrap();
+
+        // When unescaped, the incomplete brackets `[` would produce a glob failure.
+        File::create(temp_dir.path().join("backup[2024.par2")).unwrap();
+        File::create(temp_dir.path().join("backup[2024.vol000+01.par2")).unwrap();
+
+        let result = locate_files(&temp_dir.path().join("backup[2024.par2")).unwrap();
+
+        assert_eq!(result.len(), 2);
     }
 }
