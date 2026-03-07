@@ -54,7 +54,6 @@ pub enum Par2WarningDataType {
     SliceChecksum,
     RecoverySlice,
     Creator,
-    Unknown,
 }
 
 impl std::fmt::Display for Par2WarningDataType {
@@ -64,7 +63,6 @@ impl std::fmt::Display for Par2WarningDataType {
             Par2WarningDataType::SliceChecksum => write!(f, "slice checksum"),
             Par2WarningDataType::RecoverySlice => write!(f, "recovery slice"),
             Par2WarningDataType::Creator => write!(f, "creator"),
-            Par2WarningDataType::Unknown => write!(f, "unknown data"),
         }
     }
 }
