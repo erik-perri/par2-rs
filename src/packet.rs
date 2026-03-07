@@ -621,6 +621,102 @@ mod tests {
         }
     }
 
+    mod parse_file_description {
+        use super::*;
+        use byteorder::WriteBytesExt;
+        use std::io::Write;
+
+        fn build_file_description_bytes(
+            file_id: Par2FileId,
+            file_md5: Par2Md5Hash,
+            file_first_16kb_md5: Par2Md5Hash,
+            file_length: u64,
+            file_name: &[u8],
+        ) -> Vec<u8> {
+            let mut cursor = Cursor::new(Vec::new());
+
+            cursor.write_all(file_id.as_ref()).unwrap();
+            cursor.write_all(file_md5.as_ref()).unwrap();
+            cursor.write_all(file_first_16kb_md5.as_ref()).unwrap();
+            cursor.write_u64::<LittleEndian>(file_length).unwrap();
+
+            let padding_bytes = (4 - (file_name.len() % 4)) % 4;
+            let file_name_padding = vec![0; padding_bytes];
+
+            cursor.write_all(&file_name).unwrap();
+            cursor.write_all(&file_name_padding).unwrap();
+
+            cursor.into_inner()
+        }
+
+        #[test]
+        fn normal_file_description() {
+            let file_description_bytes = build_file_description_bytes(
+                Par2FileId([0xAA; 16]),
+                Par2Md5Hash([0xBB; 16]),
+                Par2Md5Hash([0xCC; 16]),
+                1234,
+                b"a.txt", // 3 bytes of padding
+            );
+
+            let parsed_body = parse_file_description(&file_description_bytes).unwrap();
+            let Par2PacketBody::FileDesc(file_desc) = parsed_body else {
+                panic!("Expected FileDesc variant");
+            };
+
+            assert_eq!(file_desc.file_id, Par2FileId([0xAA; 16]));
+            assert_eq!(file_desc.file_md5, Par2Md5Hash([0xBB; 16]));
+            assert_eq!(file_desc.file_first_16kb_md5, Par2Md5Hash([0xCC; 16]));
+            assert_eq!(file_desc.file_length, 1234);
+            assert_eq!(file_desc.file_name, b"a.txt");
+        }
+
+        #[test]
+        fn no_name_padding() {
+            let file_description_bytes = build_file_description_bytes(
+                Par2FileId([0xAA; 16]),
+                Par2Md5Hash([0xBB; 16]),
+                Par2Md5Hash([0xCC; 16]),
+                1234,
+                b"test.txt", // 0 bytes of padding
+            );
+
+            let parsed_body = parse_file_description(&file_description_bytes).unwrap();
+            let Par2PacketBody::FileDesc(file_desc) = parsed_body else {
+                panic!("Expected FileDesc variant");
+            };
+
+            assert_eq!(file_desc.file_name, b"test.txt");
+        }
+
+        #[test]
+        fn minimal_name_padding() {
+            let file_description_bytes = build_file_description_bytes(
+                Par2FileId([0xAA; 16]),
+                Par2Md5Hash([0xBB; 16]),
+                Par2Md5Hash([0xCC; 16]),
+                1234,
+                b"testtxt", // 1 byte of padding
+            );
+
+            let parsed_body = parse_file_description(&file_description_bytes).unwrap();
+            let Par2PacketBody::FileDesc(file_desc) = parsed_body else {
+                panic!("Expected FileDesc variant");
+            };
+
+            assert_eq!(file_desc.file_name, b"testtxt");
+        }
+
+        #[test]
+        fn too_short() {
+            let file_description_bytes = [0xAA; 32];
+
+            let parsed_body = parse_file_description(&file_description_bytes);
+
+            assert!(parsed_body.is_err());
+        }
+    }
+
     mod find_next_header_offset {
         use super::*;
 
