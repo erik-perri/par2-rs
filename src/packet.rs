@@ -398,3 +398,39 @@ fn trim_trailing_null_bytes(data: &[u8]) -> Vec<u8> {
 
     Vec::new()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trim_trailing_null_bytes_empty_input() {
+        assert_eq!(trim_trailing_null_bytes(&[]), Vec::new());
+    }
+
+    #[test]
+    fn test_trim_trailing_null_bytes_all_null_bytes() {
+        assert_eq!(trim_trailing_null_bytes(&[0; 5]), Vec::new());
+    }
+
+    #[test]
+    fn test_trim_trailing_null_bytes_no_null_bytes() {
+        assert_eq!(
+            trim_trailing_null_bytes(&[0x10, 0x11, 0x12]),
+            vec![0x10, 0x11, 0x12]
+        );
+    }
+
+    #[test]
+    fn test_trim_trailing_null_bytes_only_trailing_null_bytes() {
+        assert_eq!(
+            trim_trailing_null_bytes(&[0x10, 0, 0x12, 0x13, 0, 0]),
+            vec![0x10, 0, 0x12, 0x13]
+        );
+    }
+
+    #[test]
+    fn test_trim_trailing_null_bytes_single_byte_with_trailing() {
+        assert_eq!(trim_trailing_null_bytes(&[0x41, 0x00, 0x00]), vec![0x41]);
+    }
+}
