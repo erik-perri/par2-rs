@@ -35,7 +35,8 @@ pub enum Par2PacketBody {
 #[derive(Debug)]
 pub struct Par2MainData {
     pub slice_size: u64,
-    pub file_ids: Vec<Par2FileId>,
+    pub recovery_file_ids: Vec<Par2FileId>,
+    pub non_recovery_file_ids: Vec<Par2FileId>,
 }
 
 #[derive(Debug)]
@@ -254,7 +255,7 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         )));
     }
 
-    let mut file_ids = Vec::with_capacity(file_count as usize);
+    let mut recovery_file_ids = Vec::with_capacity(file_count as usize);
 
     for _ in 0..file_count {
         let mut file_id = [0; 16];
@@ -263,12 +264,33 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
             .read_exact(&mut file_id)
             .map_err(|e| Par2Error::ParseError(format!("Failed to read file ID: {}", e)))?;
 
-        file_ids.push(file_id);
+        recovery_file_ids.push(file_id);
+    }
+
+    let remaining_bytes = cursor.get_ref().len() as u64 - cursor.position();
+    if remaining_bytes % 16 != 0 {
+        return Err(Par2Error::ParseError(format!(
+            "Found {} bytes remaining after reading recovery file IDs, expected 16 bytes per verification file ID",
+            remaining_bytes
+        )));
+    }
+
+    let non_recovery_file_count = remaining_bytes / 16;
+    let mut non_recovery_file_ids = Vec::with_capacity(non_recovery_file_count as usize);
+
+    for _ in 0..non_recovery_file_count {
+        let mut file_id = [0; 16];
+        cursor.read_exact(&mut file_id).map_err(|e| {
+            Par2Error::ParseError(format!("Failed to read verification file ID: {}", e))
+        })?;
+
+        non_recovery_file_ids.push(file_id);
     }
 
     Ok(Par2PacketBody::Main(Par2MainData {
         slice_size,
-        file_ids,
+        recovery_file_ids,
+        non_recovery_file_ids,
     }))
 }
 
