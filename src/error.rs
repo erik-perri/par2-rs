@@ -11,7 +11,6 @@ pub enum Par2Error {
     MissingComputedMD5,
     MissingFileDescriptions,
     MissingMainPacket,
-    MissingRecoverySetId,
     MissingSliceChecksums,
     ParseError(String),
 }
@@ -42,7 +41,6 @@ impl std::fmt::Display for Par2Error {
             Par2Error::MissingComputedMD5 => write!(f, "Missing computed MD5"),
             Par2Error::MissingFileDescriptions => write!(f, "Missing file descriptions"),
             Par2Error::MissingMainPacket => write!(f, "Missing main packet"),
-            Par2Error::MissingRecoverySetId => write!(f, "Missing recovery set ID"),
             Par2Error::MissingSliceChecksums => write!(f, "Missing slice checksums"),
             Par2Error::ParseError(message) => write!(f, "Parse error: {}", message),
         }

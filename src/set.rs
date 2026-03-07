@@ -102,6 +102,9 @@ impl Par2ParsedSet {
             }
         }
 
+        let main = main.ok_or(Par2Error::MissingMainPacket)?;
+        let recovery_set_id = recovery_set_id.ok_or(Par2Error::MissingMainPacket)?;
+
         if creators.is_empty() {
             warnings.push(Par2Warning::MissingCreator);
         }
@@ -115,8 +118,8 @@ impl Par2ParsedSet {
         }
 
         Ok(Par2ParsedSet {
-            recovery_set_id: recovery_set_id.ok_or(Par2Error::MissingRecoverySetId)?,
-            main: main.ok_or(Par2Error::MissingMainPacket)?,
+            recovery_set_id,
+            main,
             file_descriptions,
             slice_checksums,
             recovery_slices,
