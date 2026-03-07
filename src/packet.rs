@@ -39,9 +39,22 @@ impl From<[u8; 16]> for Par2Md5Hash {
     }
 }
 
-pub type Par2PacketType = [u8; 16];
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Par2RecoverySetId([u8; 16]);
 
-pub type Par2RecoverySetId = [u8; 16];
+impl AsMut<[u8]> for Par2RecoverySetId {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+}
+
+impl AsRef<[u8]> for Par2RecoverySetId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+pub type Par2PacketType = [u8; 16];
 
 pub struct Par2Packet {
     pub header: Par2PacketHeader,
@@ -231,9 +244,9 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
         .read_exact(expected_md5.as_mut())
         .map_err(|e| Par2Error::ParseError(format!("Failed to read MD5: {}", e)))?;
 
-    let mut recovery_set_id: Par2RecoverySetId = [0; 16];
+    let mut recovery_set_id: Par2RecoverySetId = Par2RecoverySetId([0; 16]);
     cursor
-        .read_exact(&mut recovery_set_id)
+        .read_exact(recovery_set_id.as_mut())
         .map_err(|e| Par2Error::ParseError(format!("Failed to read recovery set ID: {}", e)))?;
 
     let mut packet_type: Par2PacketType = [0; 16];
