@@ -1,14 +1,21 @@
 use crate::error::Par2Error;
 use std::path::{Path, PathBuf};
 
-pub fn locate_files(base_file: &Path) -> Result<Vec<PathBuf>, Par2Error> {
-    let mut files = vec![base_file.to_path_buf()];
+pub fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
+    if !base.is_file() {
+        return Err(Par2Error::FilePathError(format!(
+            "\"{}\" is not a valid file",
+            base.display()
+        )));
+    }
 
-    let parent_path = base_file
+    let mut files = vec![base.to_path_buf()];
+
+    let parent_path = base
         .parent()
         .ok_or(Par2Error::FilePathError("Missing parent directory".into()))?;
 
-    let base_file_stem = base_file
+    let base_file_stem = base
         .file_stem()
         .ok_or(Par2Error::FilePathError("Missing file stem".into()))?
         .to_str()
@@ -34,4 +41,52 @@ pub fn locate_files(base_file: &Path) -> Result<Vec<PathBuf>, Par2Error> {
     }
 
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use tempfile::TempDir;
+
+    #[test]
+    fn with_volume_files() {
+        let temp_dir = TempDir::new().unwrap();
+
+        File::create(temp_dir.path().join("backup.par2")).unwrap();
+        File::create(temp_dir.path().join("backup.vol000+01.par2")).unwrap();
+        File::create(temp_dir.path().join("backup.vol001+02.par2")).unwrap();
+
+        File::create(temp_dir.path().join("other.vol000+01.par2")).unwrap();
+
+        let result = locate_files(&temp_dir.path().join("backup.par2")).unwrap();
+
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0], temp_dir.path().join("backup.par2"));
+        assert_eq!(result[1], temp_dir.path().join("backup.vol000+01.par2"));
+        assert_eq!(result[2], temp_dir.path().join("backup.vol001+02.par2"));
+    }
+
+    #[test]
+    fn no_volume_files() {
+        let temp_dir = TempDir::new().unwrap();
+
+        File::create(temp_dir.path().join("backup.par2")).unwrap();
+        File::create(temp_dir.path().join("other.par2")).unwrap();
+
+        let result = locate_files(&temp_dir.path().join("backup.par2")).unwrap();
+
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], temp_dir.path().join("backup.par2"));
+    }
+
+    #[test]
+    fn excludes_nonexistent_base_file() {
+        let temp_dir = TempDir::new().unwrap();
+        let nonexistent = temp_dir.path().join("why_did_you_break_tests.par2");
+
+        let result = locate_files(&nonexistent);
+
+        assert!(result.is_err());
+    }
 }
