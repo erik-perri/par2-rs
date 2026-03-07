@@ -1,5 +1,6 @@
 use crate::packet::{Par2Md5Hash, Par2PacketType, Par2RecoverySetId};
 
+#[derive(Debug)]
 pub enum Par2Error {
     AllFileDescriptionsCorrupt,
     AllSliceChecksumsCorrupt,

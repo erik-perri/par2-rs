@@ -529,4 +529,145 @@ mod tests {
             assert_eq!(trim_trailing_null_bytes(&[0x41, 0x00, 0x00]), vec![0x41]);
         }
     }
+
+    mod parse_header {
+        use super::*;
+        use byteorder::WriteBytesExt;
+        use std::io::Write;
+
+        fn build_header_bytes(
+            packet_length: u64,
+            expected_md5: Par2Md5Hash,
+            recovery_set_id: Par2RecoverySetId,
+            packet_type: Par2PacketType,
+            magic_bytes: Option<&[u8]>,
+        ) -> [u8; 64] {
+            let mut cursor = Cursor::new(Vec::new());
+
+            cursor
+                .write_all(magic_bytes.unwrap_or(&PAR2_PACKET_MAGIC_HEADER))
+                .unwrap();
+            cursor.write_u64::<LittleEndian>(packet_length).unwrap();
+            cursor.write_all(expected_md5.as_ref()).unwrap();
+            cursor.write_all(recovery_set_id.as_ref()).unwrap();
+            cursor.write_all(packet_type.as_ref()).unwrap();
+
+            cursor.into_inner().try_into().unwrap()
+        }
+
+        #[test]
+        fn parses_header() {
+            let header_bytes = build_header_bytes(
+                1234,
+                Par2Md5Hash([
+                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+                    0xAA, 0xAA, 0xAA,
+                ]),
+                Par2RecoverySetId([
+                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+                    0xBB, 0xBB, 0xBB,
+                ]),
+                [
+                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+                    0xCC, 0xCC, 0xCC,
+                ],
+                None,
+            );
+
+            let parsed_header = parse_header(&header_bytes).unwrap();
+
+            assert_eq!(parsed_header.packet_length, 1234);
+            assert_eq!(
+                parsed_header.expected_md5,
+                Par2Md5Hash([
+                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+                    0xAA, 0xAA, 0xAA,
+                ])
+            );
+            assert_eq!(
+                parsed_header.recovery_set_id,
+                Par2RecoverySetId([
+                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+                    0xBB, 0xBB, 0xBB,
+                ])
+            );
+            assert_eq!(
+                parsed_header.packet_type,
+                [
+                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+                    0xCC, 0xCC, 0xCC,
+                ]
+            );
+        }
+
+        #[test]
+        fn truncated_below_magic_bytes() {
+            let header_bytes = build_header_bytes(
+                1234,
+                Par2Md5Hash([
+                    0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD,
+                    0xDD, 0xDD, 0xDD,
+                ]),
+                Par2RecoverySetId([
+                    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
+                    0xEE, 0xEE, 0xEE,
+                ]),
+                [
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF,
+                ],
+                None,
+            );
+
+            let truncated = &header_bytes[0..4];
+
+            assert!(parse_header(truncated).is_err());
+        }
+
+        #[test]
+        fn truncated_after_magic_bytes() {
+            let header_bytes = build_header_bytes(
+                1234,
+                Par2Md5Hash([
+                    0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+                    0xFF, 0xFF, 0xFF,
+                ]),
+                Par2RecoverySetId([
+                    0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE, 0xEE,
+                    0xEE, 0xEE, 0xEE,
+                ]),
+                [
+                    0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD, 0xDD,
+                    0xDD, 0xDD, 0xDD,
+                ],
+                None,
+            );
+
+            let truncated = &header_bytes[0..32];
+
+            assert!(parse_header(truncated).is_err());
+        }
+
+        #[test]
+        fn invalid_magic_bytes() {
+            let header_bytes = build_header_bytes(
+                1234,
+                Par2Md5Hash([
+                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+                    0xAA, 0xAA, 0xAA,
+                ]),
+                Par2RecoverySetId([
+                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+                    0xBB, 0xBB, 0xBB,
+                ]),
+                [
+                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+                    0xCC, 0xCC, 0xCC,
+                ],
+                Some(b"INVALID\0"),
+            );
+
+            assert!(parse_header(&header_bytes).is_err());
+        }
+    }
 }
