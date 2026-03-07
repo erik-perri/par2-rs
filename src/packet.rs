@@ -593,6 +593,135 @@ mod tests {
         }
     }
 
+    mod parse_body_main {
+        use super::*;
+        use byteorder::WriteBytesExt;
+        use std::io::Write;
+
+        fn build_body_main_bytes(
+            slice_size: u64,
+            recovery_file_ids: &[Par2FileId],
+            non_recovery_file_ids: &[Par2FileId],
+            file_count: Option<u32>,
+        ) -> Vec<u8> {
+            let mut cursor = Cursor::new(Vec::new());
+
+            cursor.write_u64::<LittleEndian>(slice_size).unwrap();
+
+            let file_count = file_count.unwrap_or(recovery_file_ids.len() as u32);
+            cursor.write_u32::<LittleEndian>(file_count).unwrap();
+
+            for file_id in recovery_file_ids {
+                cursor.write_all(file_id.as_ref()).unwrap();
+            }
+            for file_id in non_recovery_file_ids {
+                cursor.write_all(file_id.as_ref()).unwrap();
+            }
+
+            cursor.into_inner()
+        }
+
+        #[test]
+        fn normal_body() {
+            let body_bytes = build_body_main_bytes(
+                1234,
+                &[
+                    Par2FileId([
+                        0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+                        0xAA, 0xAA, 0xAA, 0xAA,
+                    ]),
+                    Par2FileId([
+                        0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+                        0xBB, 0xBB, 0xBB, 0xBB,
+                    ]),
+                ],
+                &[],
+                None,
+            );
+
+            let parsed_body = parse_body_main(&body_bytes).unwrap();
+            let Par2PacketBody::Main(main_data) = parsed_body else {
+                panic!("Expected Main variant");
+            };
+
+            assert_eq!(main_data.slice_size, 1234);
+            assert_eq!(main_data.recovery_file_ids.len(), 2);
+            assert_eq!(
+                main_data.recovery_file_ids[0],
+                Par2FileId([
+                    0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA, 0xAA,
+                    0xAA, 0xAA, 0xAA,
+                ])
+            );
+            assert_eq!(
+                main_data.recovery_file_ids[1],
+                Par2FileId([
+                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+                    0xBB, 0xBB, 0xBB,
+                ])
+            );
+
+            assert_eq!(main_data.non_recovery_file_ids.len(), 0);
+        }
+
+        #[test]
+        fn non_recovery_files() {
+            let body_bytes = build_body_main_bytes(
+                1234,
+                &[],
+                &[Par2FileId([
+                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+                    0xCC, 0xCC, 0xCC,
+                ])],
+                None,
+            );
+
+            let parsed_body = parse_body_main(&body_bytes).unwrap();
+            let Par2PacketBody::Main(main_data) = parsed_body else {
+                panic!("Expected Main variant");
+            };
+
+            assert_eq!(main_data.slice_size, 1234);
+
+            assert_eq!(main_data.recovery_file_ids.len(), 0);
+
+            assert_eq!(main_data.non_recovery_file_ids.len(), 1);
+            assert_eq!(
+                main_data.non_recovery_file_ids[0],
+                Par2FileId([
+                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+                    0xCC, 0xCC, 0xCC,
+                ]),
+            )
+        }
+
+        #[test]
+        fn invalid_file_count() {
+            let body_bytes = build_body_main_bytes(1234, &[], &[], Some(10));
+
+            assert!(parse_body_main(&body_bytes).is_err());
+        }
+
+        #[test]
+        fn unexpected_size() {
+            let body_bytes = build_body_main_bytes(
+                1234,
+                &[Par2FileId([
+                    0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+                    0xCC, 0xCC, 0xCC,
+                ])],
+                &[Par2FileId([
+                    0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB,
+                    0xBB, 0xBB, 0xBB,
+                ])],
+                None,
+            );
+            let truncated = &body_bytes[0..body_bytes.len() - 4];
+
+            assert!(parse_body_main(&truncated).is_err());
+        }
+    }
+
     mod find_next_header_offset {
         use super::*;
 
