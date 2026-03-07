@@ -533,6 +533,78 @@ mod tests {
         }
     }
 
+    mod parse_body {
+        use super::*;
+
+        #[test]
+        fn main_type_routing() {
+            let packet_type = PAR2_PACKET_MAGIC_MAIN;
+            let body_bytes: Vec<u8> = vec![0x00; 12];
+
+            let parsed_body = parse_body(packet_type, &body_bytes).unwrap();
+            let Par2PacketBody::Main(_) = parsed_body else {
+                panic!("Expected Main variant");
+            };
+        }
+
+        #[test]
+        fn file_desc_type_routing() {
+            let packet_type = PAR2_PACKET_MAGIC_FILE_DESC;
+            let body_bytes: Vec<u8> = vec![0x00; 64];
+
+            let parsed_body = parse_body(packet_type, &body_bytes).unwrap();
+            let Par2PacketBody::FileDesc(_) = parsed_body else {
+                panic!("Expected FileDesc variant");
+            };
+        }
+
+        #[test]
+        fn slice_checksum_type_routing() {
+            let packet_type = PAR2_PACKET_MAGIC_SLICE_CHECKSUM;
+            let body_bytes: Vec<u8> = vec![0x00; 56];
+
+            let parsed_body = parse_body(packet_type, &body_bytes).unwrap();
+            let Par2PacketBody::SliceChecksum(_) = parsed_body else {
+                panic!("Expected SliceChecksum variant");
+            };
+        }
+
+        #[test]
+        fn recovery_slice_type_routing() {
+            let packet_type = PAR2_PACKET_MAGIC_RECOVERY_SLICE;
+            let body_bytes: Vec<u8> = vec![0x00; 12];
+
+            let parsed_body = parse_body(packet_type, &body_bytes).unwrap();
+            let Par2PacketBody::RecoverySlice(_) = parsed_body else {
+                panic!("Expected RecoverySlice variant");
+            };
+        }
+
+        #[test]
+        fn creator_type_routing() {
+            let packet_type = PAR2_PACKET_MAGIC_CREATOR;
+            let body_bytes: Vec<u8> = vec![0x00; 16];
+
+            let parsed_body = parse_body(packet_type, &body_bytes).unwrap();
+            let Par2PacketBody::Creator(_) = parsed_body else {
+                panic!("Expected Creator variant");
+            };
+        }
+
+        #[test]
+        fn unknown_type_routing() {
+            let packet_type = [0xCC; 16];
+            let body_bytes: Vec<u8> = vec![0x00; 16];
+
+            let parsed_body = parse_body(&packet_type, &body_bytes).unwrap();
+            let Par2PacketBody::Unknown(unknown_type) = parsed_body else {
+                panic!("Expected Unknown variant");
+            };
+
+            assert_eq!(unknown_type, packet_type);
+        }
+    }
+
     mod parse_body_main {
         use super::*;
         use byteorder::WriteBytesExt;
