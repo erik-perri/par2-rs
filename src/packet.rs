@@ -4,7 +4,7 @@ use md5::{Digest, Md5};
 use std::io::{Cursor, Read};
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Par2FileId([u8; 16]);
+pub struct Par2FileId(pub(crate) [u8; 16]);
 
 impl AsMut<[u8]> for Par2FileId {
     fn as_mut(&mut self) -> &mut [u8] {
@@ -19,7 +19,7 @@ impl AsRef<[u8]> for Par2FileId {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Par2Md5Hash([u8; 16]);
+pub struct Par2Md5Hash(pub(crate) [u8; 16]);
 
 impl AsMut<[u8]> for Par2Md5Hash {
     fn as_mut(&mut self) -> &mut [u8] {
@@ -34,7 +34,7 @@ impl AsRef<[u8]> for Par2Md5Hash {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub struct Par2RecoverySetId([u8; 16]);
+pub struct Par2RecoverySetId(pub(crate) [u8; 16]);
 
 impl AsMut<[u8]> for Par2RecoverySetId {
     fn as_mut(&mut self) -> &mut [u8] {
@@ -56,11 +56,11 @@ pub struct Par2Packet {
 }
 
 pub struct Par2PacketHeader {
-    packet_length: u64,
+    pub(crate) packet_length: u64,
     pub expected_md5: Par2Md5Hash,
     pub computed_md5: Option<Par2Md5Hash>,
     pub recovery_set_id: Par2RecoverySetId,
-    packet_type: Par2PacketType,
+    pub(crate) packet_type: Par2PacketType,
 }
 
 #[derive(Debug)]
@@ -82,34 +82,34 @@ pub struct Par2MainData {
 
 #[derive(Debug)]
 pub struct Par2FileDescriptionData {
-    file_id: Par2FileId,
-    file_md5: Par2Md5Hash,
-    file_first_16kb_md5: Par2Md5Hash,
-    file_length: u64,
-    file_name: Vec<u8>, // ASCII bytes (not null-terminated, zero-padded to 4-byte alignment)
+    pub(crate) file_id: Par2FileId,
+    pub(crate) file_md5: Par2Md5Hash,
+    pub(crate) file_first_16kb_md5: Par2Md5Hash,
+    pub(crate) file_length: u64,
+    pub(crate) file_name: Vec<u8>, // ASCII bytes (not null-terminated, zero-padded to 4-byte alignment)
 }
 
 #[derive(Debug)]
 pub struct Par2SliceChecksumData {
-    file_id: Par2FileId,
-    entries: Vec<Par2SliceChecksumEntry>,
+    pub(crate) file_id: Par2FileId,
+    pub(crate) entries: Vec<Par2SliceChecksumEntry>,
 }
 
 #[derive(Debug)]
 pub struct Par2SliceChecksumEntry {
-    md5: Par2Md5Hash,
-    crc32: u32,
+    pub(crate) md5: Par2Md5Hash,
+    pub(crate) crc32: u32,
 }
 
 #[derive(Debug)]
 pub struct Par2RecoverySliceData {
-    exponent: u32,
-    recovery_data: Vec<u8>,
+    pub(crate) exponent: u32,
+    pub(crate) recovery_data: Vec<u8>,
 }
 
 #[derive(Debug)]
 pub struct Par2CreatorData {
-    name: Vec<u8>,
+    pub(crate) name: Vec<u8>,
 }
 
 pub const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
@@ -715,7 +715,7 @@ mod tests {
             let padding_bytes = (4 - (file_name.len() % 4)) % 4;
             let file_name_padding = vec![0; padding_bytes];
 
-            cursor.write_all(&file_name).unwrap();
+            cursor.write_all(file_name).unwrap();
             cursor.write_all(&file_name_padding).unwrap();
 
             cursor.into_inner()
