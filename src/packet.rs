@@ -270,7 +270,7 @@ fn parse_body(packet_type: &Par2PacketType, data: &[u8]) -> Result<Par2PacketBod
         PAR2_PACKET_MAGIC_SLICE_CHECKSUM => parse_slice_checksum(data),
         PAR2_PACKET_MAGIC_RECOVERY_SLICE => parse_recovery_slice(data),
         PAR2_PACKET_MAGIC_CREATOR => parse_creator(data),
-        _ => Ok(Par2PacketBody::Unknown(packet_type.clone())),
+        _ => Ok(Par2PacketBody::Unknown(*packet_type)),
     }
 }
 
