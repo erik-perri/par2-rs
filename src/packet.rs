@@ -77,6 +77,9 @@ pub const PAR2_PACKET_MAGIC_SLICE_CHECKSUM: &[u8] = b"PAR 2.0\0IFSC\0\0\0\0";
 pub const PAR2_PACKET_MAGIC_RECOVERY_SLICE: &[u8] = b"PAR 2.0\0RecvSlic";
 pub const PAR2_PACKET_MAGIC_CREATOR: &[u8] = b"PAR 2.0\0Creator\0";
 
+const PAR2_HEADER_SIZE: usize = 64;
+const PAR2_HASH_START_OFFSET: usize = 32;
+
 pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error> {
     let file_data = std::fs::read(file_path)?;
     let file_size = file_data.len();
@@ -95,10 +98,27 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
                     ))
                 })?;
 
+                // The packet length must be large enough to contain the entire header.
+                if header.packet_length < PAR2_HEADER_SIZE as u64 {
+                    return Err(Par2Error::ParseError(format!(
+                        "Header packet length [{}] is less than minimum required [{}]",
+                        header.packet_length, PAR2_HEADER_SIZE,
+                    )));
+                }
+
+                let header_hash_start_position = header_offset + PAR2_HASH_START_OFFSET;
+                let header_hash_end_position =
+                    header_offset.saturating_add(header.packet_length as usize);
+
+                if header_hash_end_position > file_size {
+                    return Err(Par2Error::ParseError(format!(
+                        "Header hash end position [{}] exceeds file size [{}]",
+                        header_hash_end_position, file_size
+                    )));
+                }
+
                 let mut hasher = Md5::new();
-                hasher.update(
-                    &file_data[header_offset + 32..header_offset + header.packet_length as usize],
-                );
+                hasher.update(&file_data[header_hash_start_position..header_hash_end_position]);
                 header.computed_md5 = Some(hasher.finalize().into());
 
                 let header_packet_length = header.packet_length as usize;
@@ -115,7 +135,7 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
                     header_offset, header_packet_length
                 );
 
-                let body_offset = header_offset + 64;
+                let body_offset = header_offset + PAR2_HEADER_SIZE;
                 let body_bytes = &file_data[body_offset..header_offset + header_packet_length];
 
                 let body = parse_body(&header.packet_type, body_bytes).map_err(|e| {
