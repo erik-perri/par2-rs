@@ -308,7 +308,7 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     }
 
     let remaining_bytes = cursor.get_ref().len() as u64 - cursor.position();
-    if remaining_bytes % 16 != 0 {
+    if !remaining_bytes.is_multiple_of(16) {
         return Err(Par2Error::ParseError(format!(
             "Found {} bytes remaining after reading recovery file IDs, expected 16 bytes per verification file ID",
             remaining_bytes
@@ -386,7 +386,7 @@ fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         .map_err(|e| Par2Error::ParseError(format!("Failed to read IFSC file ID: {}", e)))?;
 
     let entry_bytes = cursor.get_ref().len() - cursor.position() as usize;
-    if entry_bytes % 20 != 0 {
+    if !entry_bytes.is_multiple_of(20) {
         return Err(Par2Error::ParseError("Invalid IFSC entry size".to_string()));
     }
 
