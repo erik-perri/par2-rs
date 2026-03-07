@@ -71,7 +71,6 @@ impl std::fmt::Display for Par2WarningDataType {
 pub enum Par2Warning {
     AllRecoverySlicesCorrupt,
     MissingCreator,
-    NoRecoverySlices,
     IntegrityFailure(Par2WarningDataType, Par2Md5Hash, Par2Md5Hash),
     UnexpectedRecoverySetId(Par2WarningDataType, Par2RecoverySetId, Par2RecoverySetId),
     UnknownPacketType,
@@ -82,7 +81,6 @@ impl std::fmt::Display for Par2Warning {
         match self {
             Par2Warning::AllRecoverySlicesCorrupt => write!(f, "All recovery slices are corrupt"),
             Par2Warning::MissingCreator => write!(f, "Missing creator"),
-            Par2Warning::NoRecoverySlices => write!(f, "No recovery slices"),
             Par2Warning::IntegrityFailure(data_type, expected, actual) => {
                 write!(
                     f,
