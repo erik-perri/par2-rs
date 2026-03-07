@@ -319,16 +319,12 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         Par2Error::ParseError(format!("Failed to read FileDesc file length: {}", e))
     })?;
 
-    let mut file_name = vec![0; data.len() - cursor.position() as usize];
+    let mut parsed_name = vec![0; data.len() - cursor.position() as usize];
     cursor
-        .read_exact(&mut file_name)
+        .read_exact(&mut parsed_name)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file name: {}", e)))?;
 
-    let trailing_null_bytes = file_name
-        .iter()
-        .rposition(|&b| b == 0)
-        .unwrap_or(file_name.len());
-    file_name.truncate(trailing_null_bytes);
+    let file_name = trim_trailing_null_bytes(&parsed_name);
 
     Ok(Par2PacketBody::FileDesc(Par2FileDescriptionData {
         file_id,
@@ -395,13 +391,17 @@ fn parse_recovery_slice(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 }
 
 fn parse_creator(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
-    let mut file_name = data.to_vec();
+    let name = trim_trailing_null_bytes(data);
 
-    let trailing_null_bytes = file_name
-        .iter()
-        .rposition(|&b| b == 0)
-        .unwrap_or(file_name.len());
-    file_name.truncate(trailing_null_bytes);
+    Ok(Par2PacketBody::Creator(Par2CreatorData { name }))
+}
 
-    Ok(Par2PacketBody::Creator(Par2CreatorData { name: file_name }))
+fn trim_trailing_null_bytes(data: &[u8]) -> Vec<u8> {
+    let last_non_null_byte = data.iter().rposition(|&b| b != 0);
+
+    if let Some(last_non_null_byte) = last_non_null_byte {
+        return data[..last_non_null_byte + 1].to_vec();
+    }
+
+    Vec::new()
 }
