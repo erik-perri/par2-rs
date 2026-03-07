@@ -51,15 +51,15 @@ impl AsRef<[u8]> for Par2RecoverySetId {
 pub type Par2PacketType = [u8; 16];
 
 pub struct Par2Packet {
-    pub header: Par2PacketHeader,
-    pub body: Par2PacketBody,
+    pub(crate) header: Par2PacketHeader,
+    pub(crate) body: Par2PacketBody,
 }
 
 pub struct Par2PacketHeader {
     pub(crate) packet_length: u64,
-    pub expected_md5: Par2Md5Hash,
-    pub computed_md5: Option<Par2Md5Hash>,
-    pub recovery_set_id: Par2RecoverySetId,
+    pub(crate) expected_md5: Par2Md5Hash,
+    pub(crate) computed_md5: Option<Par2Md5Hash>,
+    pub(crate) recovery_set_id: Par2RecoverySetId,
     pub(crate) packet_type: Par2PacketType,
 }
 
@@ -75,9 +75,9 @@ pub enum Par2PacketBody {
 
 #[derive(Debug)]
 pub struct Par2MainData {
-    pub slice_size: u64,
-    pub recovery_file_ids: Vec<Par2FileId>,
-    pub non_recovery_file_ids: Vec<Par2FileId>,
+    pub(crate) slice_size: u64,
+    pub(crate) recovery_file_ids: Vec<Par2FileId>,
+    pub(crate) non_recovery_file_ids: Vec<Par2FileId>,
 }
 
 #[derive(Debug)]
@@ -86,7 +86,7 @@ pub struct Par2FileDescriptionData {
     pub(crate) file_md5: Par2Md5Hash,
     pub(crate) file_first_16kb_md5: Par2Md5Hash,
     pub(crate) file_length: u64,
-    pub(crate) file_name: Vec<u8>, // ASCII bytes (not null-terminated, zero-padded to 4-byte alignment)
+    pub(crate) file_name: Vec<u8>,
 }
 
 #[derive(Debug)]

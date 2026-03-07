@@ -13,7 +13,7 @@ pub(crate) struct Parsed<T> {
 }
 
 #[derive(Debug)]
-pub struct Par2ParsedSet {
+pub(crate) struct Par2ParsedSet {
     recovery_set_id: Par2RecoverySetId,
     main: Parsed<Par2MainData>,
     file_descriptions: Vec<Parsed<Par2FileDescriptionData>>,
@@ -24,14 +24,14 @@ pub struct Par2ParsedSet {
 }
 
 #[derive(Debug)]
-pub struct Par2ValidatedSet {
-    recovery_set_id: Par2RecoverySetId,
-    main: Par2MainData,
-    file_descriptions: Vec<Par2FileDescriptionData>,
-    slice_checksums: Vec<Par2SliceChecksumData>,
-    recovery_slices: Vec<Par2RecoverySliceData>,
-    creators: Vec<Par2CreatorData>,
-    warnings: Vec<Par2Warning>,
+pub(crate) struct Par2ValidatedSet {
+    pub(crate) recovery_set_id: Par2RecoverySetId,
+    pub(crate) main: Par2MainData,
+    pub(crate) file_descriptions: Vec<Par2FileDescriptionData>,
+    pub(crate) slice_checksums: Vec<Par2SliceChecksumData>,
+    pub(crate) recovery_slices: Vec<Par2RecoverySliceData>,
+    pub(crate) creators: Vec<Par2CreatorData>,
+    pub(crate) warnings: Vec<Par2Warning>,
 }
 
 impl Par2ParsedSet {
