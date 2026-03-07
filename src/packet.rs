@@ -3,6 +3,8 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use md5::{Digest, Md5};
 use std::io::{Cursor, Read};
 
+pub type Par2RecoverySetId = [u8; 16];
+
 pub type Par2FileId = [u8; 16];
 
 pub type Par2Md5Hash = [u8; 16];
@@ -16,7 +18,7 @@ pub struct Par2PacketHeader {
     packet_length: u64,
     pub expected_md5: Par2Md5Hash,
     pub computed_md5: Option<Par2Md5Hash>,
-    pub recovery_set_id: [u8; 16],
+    pub recovery_set_id: Par2RecoverySetId,
     packet_type: [u8; 16],
 }
 
@@ -32,8 +34,8 @@ pub enum Par2PacketBody {
 
 #[derive(Debug)]
 pub struct Par2MainData {
-    slice_size: u64,
-    file_ids: Vec<Par2FileId>,
+    pub slice_size: u64,
+    pub file_ids: Vec<Par2FileId>,
 }
 
 #[derive(Debug)]
