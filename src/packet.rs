@@ -124,13 +124,6 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
 
                 let header_packet_length = header.packet_length as usize;
 
-                if header_packet_length > file_size - offset {
-                    return Err(Par2Error::ParseError(format!(
-                        "Failed to parse header at offset [{}], length [{}] exceeds file size [{}]",
-                        header_offset, header_packet_length, file_size
-                    )));
-                }
-
                 println!(
                     "Parsed header at [{}], length {}",
                     header_offset, header_packet_length
