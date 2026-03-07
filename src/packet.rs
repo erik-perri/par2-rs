@@ -86,7 +86,7 @@ pub struct Par2FileDescriptionData {
     pub(crate) file_md5: Par2Md5Hash,
     pub(crate) file_first_16kb_md5: Par2Md5Hash,
     pub(crate) file_length: u64,
-    pub(crate) file_name: Vec<u8>,
+    pub(crate) file_name: String,
 }
 
 #[derive(Debug)]
@@ -342,7 +342,15 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         .read_exact(&mut parsed_name)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file name: {}", e)))?;
 
-    let file_name = trim_trailing_null_bytes(&parsed_name);
+    let file_name_bytes = trim_trailing_null_bytes(&parsed_name);
+    let file_name = match String::from_utf8(file_name_bytes) {
+        Ok(name) => name,
+        Err(_) => {
+            return Err(Par2Error::ParseError(
+                "Failed to decode FileDesc file name as UTF-8".to_string(),
+            ));
+        }
+    };
 
     Ok(Par2PacketBody::FileDesc(Par2FileDescriptionData {
         file_id,
@@ -740,7 +748,7 @@ mod tests {
             assert_eq!(file_desc.file_md5, Par2Md5Hash([0xBB; 16]));
             assert_eq!(file_desc.file_first_16kb_md5, Par2Md5Hash([0xCC; 16]));
             assert_eq!(file_desc.file_length, 1234);
-            assert_eq!(file_desc.file_name, b"a.txt");
+            assert_eq!(file_desc.file_name, "a.txt");
         }
 
         #[test]
@@ -758,7 +766,7 @@ mod tests {
                 panic!("Expected FileDesc variant");
             };
 
-            assert_eq!(file_desc.file_name, b"test.txt");
+            assert_eq!(file_desc.file_name, "test.txt");
         }
 
         #[test]
@@ -776,7 +784,7 @@ mod tests {
                 panic!("Expected FileDesc variant");
             };
 
-            assert_eq!(file_desc.file_name, b"testtxt");
+            assert_eq!(file_desc.file_name, "testtxt");
         }
 
         #[test]
@@ -786,6 +794,23 @@ mod tests {
             let parsed_body = parse_file_description(&file_description_bytes);
 
             assert!(parsed_body.is_err());
+            assert!(matches!(parsed_body, Err(Par2Error::ParseError(_))));
+        }
+
+        #[test]
+        fn invalid_name() {
+            let file_description_bytes = build_file_description_bytes(
+                Par2FileId([0xAA; 16]),
+                Par2Md5Hash([0xBB; 16]),
+                Par2Md5Hash([0xCC; 16]),
+                1234,
+                &[0xAA; 32],
+            );
+
+            let parsed_body = parse_file_description(&file_description_bytes);
+
+            assert!(parsed_body.is_err());
+            assert!(matches!(parsed_body, Err(Par2Error::ParseError(_))));
         }
     }
 

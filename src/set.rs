@@ -273,7 +273,7 @@ mod tests {
                         file_md5: Par2Md5Hash([0xBB; 16]),
                         file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                         file_length: 0,
-                        file_name: b"test.txt".to_vec(),
+                        file_name: "test.txt".to_string(),
                     }),
                     PAR2_PACKET_MAGIC_FILE_DESC,
                     recovery_set_id,
@@ -504,7 +504,7 @@ mod tests {
                             file_md5: Par2Md5Hash([0xBB; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xCC; 16]),
                             file_length: 0,
-                            file_name: b"test.txt".to_vec(),
+                            file_name: "test.txt".to_string(),
                         }),
                         PAR2_PACKET_MAGIC_FILE_DESC,
                         recovery_set_id,
@@ -583,7 +583,7 @@ mod tests {
                             file_md5: Par2Md5Hash([0xEE; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                             file_length: 0,
-                            file_name: b"test.txt".to_vec(),
+                            file_name: "test.txt".to_string(),
                         }),
                     },
                     make_packet(
@@ -626,7 +626,7 @@ mod tests {
                             file_md5: Par2Md5Hash([0xAA; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                             file_length: 0,
-                            file_name: b"test.txt".to_vec(),
+                            file_name: "test.txt".to_string(),
                         }),
                         PAR2_PACKET_MAGIC_FILE_DESC,
                         recovery_set_id,
@@ -677,7 +677,7 @@ mod tests {
                             file_md5: Par2Md5Hash([0xFF; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                             file_length: 0,
-                            file_name: b"test.txt".to_vec(),
+                            file_name: "test.txt".to_string(),
                         }),
                         PAR2_PACKET_MAGIC_FILE_DESC,
                         recovery_set_id,
@@ -741,7 +741,7 @@ mod tests {
                         file_md5: Par2Md5Hash([0xAA; 16]),
                         file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                         file_length: 0,
-                        file_name: b"test-a.txt".to_vec(),
+                        file_name: "test-a.txt".to_string(),
                     },
                 },
                 Parsed {
@@ -753,7 +753,7 @@ mod tests {
                         file_md5: Par2Md5Hash([0xAA; 16]),
                         file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                         file_length: 0,
-                        file_name: b"test-b.txt".to_vec(),
+                        file_name: "test-b.txt".to_string(),
                     },
                 },
             ];
@@ -767,7 +767,7 @@ mod tests {
             );
 
             assert_eq!(filtered_data.len(), 1);
-            assert_eq!(filtered_data[0].file_name, b"test-a.txt".to_vec());
+            assert_eq!(filtered_data[0].file_name, "test-a.txt".to_string());
 
             assert_eq!(warnings.len(), 1);
             assert!(matches!(
@@ -788,7 +788,7 @@ mod tests {
                     file_md5: Par2Md5Hash([0xAA; 16]),
                     file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                     file_length: 0,
-                    file_name: b"test-a.txt".to_vec(),
+                    file_name: "test-a.txt".to_string(),
                 },
             }];
 
