@@ -129,7 +129,9 @@ impl Par2ParsedSet {
     }
 
     pub fn validate(self) -> Result<Par2ValidatedSet, Par2Error> {
-        if self.main.computed_md5 != self.main.expected_md5 {
+        if self.main.computed_md5 != self.main.expected_md5
+            || self.main.recovery_set_id != self.main.data.computed_recovery_set_id
+        {
             return Err(Par2Error::MainPacketIntegrityFailure);
         }
 
@@ -256,9 +258,10 @@ mod tests {
             fn make_minimal_main(recovery_set_id: Par2RecoverySetId) -> Par2Packet {
                 make_packet(
                     Par2PacketBody::Main(Par2MainData {
-                        slice_size: 1024,
-                        recovery_file_ids: vec![],
+                        computed_recovery_set_id: recovery_set_id,
                         non_recovery_file_ids: vec![],
+                        recovery_file_ids: vec![],
+                        slice_size: 1024,
                     }),
                     PAR2_PACKET_MAGIC_MAIN,
                     recovery_set_id,
@@ -490,9 +493,10 @@ mod tests {
                 let packets = vec![
                     make_packet(
                         Par2PacketBody::Main(Par2MainData {
-                            slice_size: 1024,
-                            recovery_file_ids: vec![],
+                            computed_recovery_set_id: recovery_set_id,
                             non_recovery_file_ids: vec![],
+                            recovery_file_ids: vec![],
+                            slice_size: 1024,
                         }),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,
@@ -561,9 +565,10 @@ mod tests {
                 let packets = vec![
                     make_packet(
                         Par2PacketBody::Main(Par2MainData {
-                            slice_size: 1024,
-                            recovery_file_ids: vec![],
+                            computed_recovery_set_id: recovery_set_id,
                             non_recovery_file_ids: vec![],
+                            recovery_file_ids: vec![],
+                            slice_size: 1024,
                         }),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,
@@ -612,9 +617,10 @@ mod tests {
                 let packets = vec![
                     make_packet(
                         Par2PacketBody::Main(Par2MainData {
-                            slice_size: 1024,
-                            recovery_file_ids: vec![],
+                            computed_recovery_set_id: recovery_set_id,
                             non_recovery_file_ids: vec![],
+                            recovery_file_ids: vec![],
+                            slice_size: 1024,
                         }),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,
@@ -663,9 +669,10 @@ mod tests {
                 let packets = vec![
                     make_packet(
                         Par2PacketBody::Main(Par2MainData {
-                            slice_size: 1024,
-                            recovery_file_ids: vec![],
+                            computed_recovery_set_id: recovery_set_id,
                             non_recovery_file_ids: vec![],
+                            recovery_file_ids: vec![],
+                            slice_size: 1024,
                         }),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,

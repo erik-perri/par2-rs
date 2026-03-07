@@ -75,9 +75,10 @@ pub enum Par2PacketBody {
 
 #[derive(Debug)]
 pub struct Par2MainData {
-    pub(crate) slice_size: u64,
-    pub(crate) recovery_file_ids: Vec<Par2FileId>,
+    pub(crate) computed_recovery_set_id: Par2RecoverySetId,
     pub(crate) non_recovery_file_ids: Vec<Par2FileId>,
+    pub(crate) recovery_file_ids: Vec<Par2FileId>,
+    pub(crate) slice_size: u64,
 }
 
 #[derive(Debug)]
@@ -160,11 +161,11 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
             )));
         }
 
-        let mut hasher = Md5::new();
-        hasher.update(&file_data[header_hash_start_position..header_hash_end_position]);
-        let digest: [u8; 16] = hasher.finalize().into();
+        let computed_header_md5 = Par2Md5Hash(
+            Md5::digest(&file_data[header_hash_start_position..header_hash_end_position]).into(),
+        );
 
-        header.computed_md5 = Some(Par2Md5Hash(digest));
+        header.computed_md5 = Some(computed_header_md5);
 
         let header_packet_length = header.packet_length as usize;
 
@@ -253,6 +254,8 @@ fn parse_body(packet_type: &Par2PacketType, data: &[u8]) -> Result<Par2PacketBod
 fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
+    let computed_recovery_set_id: Par2RecoverySetId = Par2RecoverySetId(Md5::digest(data).into());
+
     let slice_size = cursor
         .read_u64::<LittleEndian>()
         .map_err(|e| Par2Error::ParseError(format!("Failed to read slice size: {}", e)))?;
@@ -304,9 +307,10 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     }
 
     Ok(Par2PacketBody::Main(Par2MainData {
-        slice_size,
-        recovery_file_ids,
+        computed_recovery_set_id,
         non_recovery_file_ids,
+        recovery_file_ids,
+        slice_size,
     }))
 }
 
