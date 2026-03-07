@@ -13,7 +13,7 @@ struct Parsed<T> {
 }
 
 #[derive(Debug)]
-pub struct Par2PotentialSet {
+pub struct Par2ParsedSet {
     recovery_set_id: Par2RecoverySetId,
     main: Parsed<Par2MainData>,
     file_descriptions: Vec<Parsed<Par2FileDescriptionData>>,
@@ -34,8 +34,8 @@ pub struct Par2ValidatedSet {
     warnings: Vec<Par2Warning>,
 }
 
-impl Par2PotentialSet {
-    pub fn from_packets(packets: Vec<Par2Packet>) -> Result<Par2PotentialSet, Par2Error> {
+impl Par2ParsedSet {
+    pub fn from_packets(packets: Vec<Par2Packet>) -> Result<Par2ParsedSet, Par2Error> {
         let mut recovery_set_id = None;
         let mut main: Option<Parsed<Par2MainData>> = None;
         let mut file_descriptions = Vec::new();
@@ -114,7 +114,7 @@ impl Par2PotentialSet {
             return Err(Par2Error::MissingSliceChecksums);
         }
 
-        Ok(Par2PotentialSet {
+        Ok(Par2ParsedSet {
             recovery_set_id: recovery_set_id.ok_or(Par2Error::MissingRecoverySetId)?,
             main: main.ok_or(Par2Error::MissingMainPacket)?,
             file_descriptions,

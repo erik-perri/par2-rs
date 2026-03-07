@@ -718,7 +718,7 @@ mod tests {
             );
             let truncated = &body_bytes[0..body_bytes.len() - 4];
 
-            assert!(parse_body_main(&truncated).is_err());
+            assert!(parse_body_main(truncated).is_err());
         }
     }
 

@@ -3,7 +3,7 @@ mod file;
 mod packet;
 mod set;
 
-use crate::set::Par2PotentialSet;
+use crate::set::Par2ParsedSet;
 use std::path::Path;
 use std::{env, process};
 
@@ -39,7 +39,7 @@ fn main() {
         packets.extend(parsed_packets);
     }
 
-    let potential_set = Par2PotentialSet::from_packets(packets).unwrap_or_else(|e| {
+    let potential_set = Par2ParsedSet::from_packets(packets).unwrap_or_else(|e| {
         println!("Failed to combine set: {}", e);
         process::exit(1);
     });
