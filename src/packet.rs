@@ -3,7 +3,20 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use md5::{Digest, Md5};
 use std::io::{Cursor, Read};
 
-pub type Par2FileId = [u8; 16];
+#[derive(Debug, Eq, PartialEq)]
+pub struct Par2FileId([u8; 16]);
+
+impl AsMut<[u8]> for Par2FileId {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.0
+    }
+}
+
+impl AsRef<[u8]> for Par2FileId {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
 
 pub type Par2Md5Hash = [u8; 16];
 
@@ -251,10 +264,10 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut recovery_file_ids = Vec::with_capacity(file_count as usize);
 
     for _ in 0..file_count {
-        let mut file_id = [0; 16];
+        let mut file_id: Par2FileId = Par2FileId([0; 16]);
 
         cursor
-            .read_exact(&mut file_id)
+            .read_exact(file_id.as_mut())
             .map_err(|e| Par2Error::ParseError(format!("Failed to read file ID: {}", e)))?;
 
         recovery_file_ids.push(file_id);
@@ -272,8 +285,8 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut non_recovery_file_ids = Vec::with_capacity(non_recovery_file_count as usize);
 
     for _ in 0..non_recovery_file_count {
-        let mut file_id = [0; 16];
-        cursor.read_exact(&mut file_id).map_err(|e| {
+        let mut file_id: Par2FileId = Par2FileId([0; 16]);
+        cursor.read_exact(file_id.as_mut()).map_err(|e| {
             Par2Error::ParseError(format!("Failed to read verification file ID: {}", e))
         })?;
 
@@ -290,17 +303,17 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
-    let mut file_id = [0; 16];
+    let mut file_id: Par2FileId = Par2FileId([0; 16]);
     cursor
-        .read_exact(&mut file_id)
+        .read_exact(file_id.as_mut())
         .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file ID: {}", e)))?;
 
-    let mut file_md5 = [0; 16];
+    let mut file_md5: Par2Md5Hash = [0; 16];
     cursor
         .read_exact(&mut file_md5)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file MD5: {}", e)))?;
 
-    let mut file_first_16kb_md5 = [0; 16];
+    let mut file_first_16kb_md5: Par2Md5Hash = [0; 16];
     cursor.read_exact(&mut file_first_16kb_md5).map_err(|e| {
         Par2Error::ParseError(format!(
             "Failed to read FileDesc file first 16KB MD5: {}",
@@ -331,9 +344,9 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
-    let mut file_id = [0; 16];
+    let mut file_id: Par2FileId = Par2FileId([0; 16]);
     cursor
-        .read_exact(&mut file_id)
+        .read_exact(file_id.as_mut())
         .map_err(|e| Par2Error::ParseError(format!("Failed to read IFSC file ID: {}", e)))?;
 
     let entry_bytes = cursor.get_ref().len() - cursor.position() as usize;
