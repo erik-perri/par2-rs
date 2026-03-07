@@ -717,6 +717,116 @@ mod tests {
         }
     }
 
+    mod parse_slice_checksum {
+        use super::*;
+        use byteorder::WriteBytesExt;
+        use std::io::Write;
+
+        fn build_slice_checksum_bytes(
+            file_id: Par2FileId,
+            entries: &[(Par2Md5Hash, u32)],
+        ) -> Vec<u8> {
+            let mut cursor = Cursor::new(Vec::new());
+            cursor.write_all(file_id.as_ref()).unwrap();
+            for (md5, crc) in entries {
+                cursor.write_all(md5.as_ref()).unwrap();
+                cursor.write_u32::<LittleEndian>(*crc).unwrap();
+            }
+            cursor.into_inner()
+        }
+
+        #[test]
+        fn single_entry() {
+            let data = build_slice_checksum_bytes(
+                Par2FileId([0xAA; 16]),
+                &[(Par2Md5Hash([0xBB; 16]), 0xDEADBEEF)],
+            );
+
+            let parsed = parse_slice_checksum(&data).unwrap();
+            let Par2PacketBody::SliceChecksum(sc) = parsed else {
+                panic!("Expected SliceChecksum variant");
+            };
+
+            assert_eq!(sc.file_id, Par2FileId([0xAA; 16]));
+            assert_eq!(sc.entries.len(), 1);
+            assert_eq!(sc.entries[0].md5, Par2Md5Hash([0xBB; 16]));
+            assert_eq!(sc.entries[0].crc32, 0xDEADBEEF);
+        }
+
+        #[test]
+        fn multiple_entries() {
+            let data = build_slice_checksum_bytes(
+                Par2FileId([0x11; 16]),
+                &[
+                    (Par2Md5Hash([0x22; 16]), 0x00000001),
+                    (Par2Md5Hash([0x33; 16]), 0x00000002),
+                    (Par2Md5Hash([0x44; 16]), 0x00000003),
+                ],
+            );
+
+            let parsed = parse_slice_checksum(&data).unwrap();
+            let Par2PacketBody::SliceChecksum(sc) = parsed else {
+                panic!("Expected SliceChecksum variant");
+            };
+
+            assert_eq!(sc.entries.len(), 3);
+            assert_eq!(sc.entries[0].crc32, 1);
+            assert_eq!(sc.entries[1].crc32, 2);
+            assert_eq!(sc.entries[2].crc32, 3);
+        }
+
+        #[test]
+        fn leftover_bytes_not_divisible_by_20() {
+            let mut data = build_slice_checksum_bytes(
+                Par2FileId([0xAA; 16]),
+                &[(Par2Md5Hash([0xBB; 16]), 0x01)],
+            );
+            data.extend_from_slice(&[0xFF; 7]); // 7 extra bytes — not a multiple of 20
+
+            assert!(parse_slice_checksum(&data).is_err());
+        }
+    }
+
+    mod parse_recovery_slice {
+        use super::*;
+        use byteorder::WriteBytesExt;
+        use std::io::Write;
+
+        #[test]
+        fn exponent_and_data_split_correctly() {
+            let mut cursor = Cursor::new(Vec::new());
+            cursor.write_u32::<LittleEndian>(42).unwrap();
+            cursor.write_all(&[0xAA, 0xBB, 0xCC, 0xDD]).unwrap();
+            let data = cursor.into_inner();
+
+            let parsed = parse_recovery_slice(&data).unwrap();
+            let Par2PacketBody::RecoverySlice(rs) = parsed else {
+                panic!("Expected RecoverySlice variant");
+            };
+
+            assert_eq!(rs.exponent, 42);
+            assert_eq!(rs.recovery_data, vec![0xAA, 0xBB, 0xCC, 0xDD]);
+        }
+    }
+
+    mod parse_creator {
+        use super::*;
+
+        #[test]
+        fn name_with_null_padding() {
+            // "par2 test 1.0" (11 bytes) + 1 null byte for 4-byte alignment
+            let mut data = b"par2 test 1.0".to_vec();
+            data.push(0x00);
+
+            let parsed = parse_creator(&data).unwrap();
+            let Par2PacketBody::Creator(creator) = parsed else {
+                panic!("Expected Creator variant");
+            };
+
+            assert_eq!(creator.name, b"par2 test 1.0");
+        }
+    }
+
     mod find_next_header_offset {
         use super::*;
 
