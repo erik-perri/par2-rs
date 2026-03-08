@@ -51,10 +51,6 @@ pub(crate) enum Par2VerificationSliceStatus {
     Valid,
 }
 
-enum Par2VerificationError {
-    FileError(String),
-}
-
 pub fn verify_set(set: Par2ValidatedSet, base_path: &Path) -> Par2VerifiedSet {
     let mut results = Vec::new();
 
