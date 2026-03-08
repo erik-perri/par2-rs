@@ -129,7 +129,7 @@ pub struct Par2RecoverySliceData {
 
 #[derive(Debug)]
 pub struct Par2CreatorData {
-    pub(crate) name: Vec<u8>,
+    pub(crate) name: String,
 }
 
 pub const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
@@ -366,7 +366,7 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file name: {}", e)))?;
 
     let file_name_bytes = trim_trailing_null_bytes(&parsed_name);
-    let file_name = match String::from_utf8(file_name_bytes) {
+    let file_name = match String::from_utf8(file_name_bytes.to_vec()) {
         Ok(name) => name,
         Err(_) => {
             return Err(Par2Error::ParseError(
@@ -440,7 +440,15 @@ fn parse_recovery_slice(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 }
 
 fn parse_creator(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
-    let name = trim_trailing_null_bytes(data);
+    let name_bytes = trim_trailing_null_bytes(data);
+    let name = match String::from_utf8(name_bytes.to_vec()) {
+        Ok(name) => name,
+        Err(_) => {
+            return Err(Par2Error::ParseError(
+                "Failed to decode creator name as UTF-8".to_string(),
+            ));
+        }
+    };
 
     Ok(Par2PacketBody::Creator(Par2CreatorData { name }))
 }
@@ -450,14 +458,14 @@ fn find_next_header_offset(data: &[u8]) -> Option<usize> {
         .position(|w| w == PAR2_PACKET_MAGIC_HEADER)
 }
 
-fn trim_trailing_null_bytes(data: &[u8]) -> Vec<u8> {
+fn trim_trailing_null_bytes(data: &[u8]) -> &[u8] {
     let last_non_null_byte = data.iter().rposition(|&b| b != 0);
 
     if let Some(last_non_null_byte) = last_non_null_byte {
-        return data[..last_non_null_byte + 1].to_vec();
+        return &data[..last_non_null_byte + 1];
     }
 
-    Vec::new()
+    &[]
 }
 
 #[cfg(test)]
@@ -929,15 +937,14 @@ mod tests {
         #[test]
         fn name_with_null_padding() {
             // "par2 test 1.0" (11 bytes) + 1 null byte for 4-byte alignment
-            let mut data = b"par2 test 1.0".to_vec();
-            data.push(0x00);
+            let data = b"par2 test 1.0\0".to_vec();
 
             let parsed = parse_creator(&data).unwrap();
             let Par2PacketBody::Creator(creator) = parsed else {
                 panic!("Expected Creator variant");
             };
 
-            assert_eq!(creator.name, b"par2 test 1.0");
+            assert_eq!(creator.name, "par2 test 1.0");
         }
     }
 

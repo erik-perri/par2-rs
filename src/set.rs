@@ -348,7 +348,7 @@ mod tests {
             fn make_minimal_creator(recovery_set_id: Par2RecoverySetId) -> Par2Packet {
                 make_packet(
                     Par2PacketBody::Creator(Par2CreatorData {
-                        name: b"test-creator".to_vec(),
+                        name: "test-creator".to_string(),
                     }),
                     PAR2_PACKET_MAGIC_CREATOR,
                     recovery_set_id,
@@ -562,7 +562,7 @@ mod tests {
                     ),
                     make_packet(
                         Par2PacketBody::Creator(Par2CreatorData {
-                            name: b"test-creator".to_vec(),
+                            name: "test-creator".to_string(),
                         }),
                         PAR2_PACKET_MAGIC_CREATOR,
                         recovery_set_id,
