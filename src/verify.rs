@@ -38,11 +38,6 @@ pub(crate) enum Par2FileVerificationResult {
         file_length: u64,
         file_path: PathBuf,
     },
-    UnexpectedFile {
-        computed_file_id: Par2FileId,
-        expected_file_id: Par2FileId,
-        file_path: PathBuf,
-    },
     Unreadable {
         error: String,
         file_id: Par2FileId,
@@ -86,15 +81,6 @@ pub fn verify_set(set: Par2ValidatedSet, base_path: &Path) -> Par2VerifiedSet {
                 continue;
             }
         };
-
-        if file_description.file_id != computed_checksums.file_id {
-            results.push(Par2FileVerificationResult::UnexpectedFile {
-                expected_file_id: file_description.file_id,
-                computed_file_id: computed_checksums.file_id,
-                file_path: file_path.clone(),
-            });
-            continue;
-        }
 
         let file_checksums = match set.slice_checksums.get(&file_description.file_id) {
             Some(checksum) => checksum,
