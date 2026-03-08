@@ -47,16 +47,11 @@ impl Par2ParsedSet {
         let mut warnings = Vec::new();
 
         for packet in packets {
-            let computed_md5 = packet
-                .header
-                .computed_md5
-                .ok_or(Par2Error::MissingComputedMD5)?;
-
             match packet.body {
                 Par2PacketBody::Main(data) => {
                     if let Some(main) = main.as_ref() {
                         if main.expected_md5 != packet.header.expected_md5
-                            || main.computed_md5 != computed_md5
+                            || main.computed_md5 != packet.header.computed_md5
                             || packet.header.recovery_set_id != recovery_set_id.unwrap()
                         {
                             return Err(Par2Error::MainPacketConflict);
@@ -70,32 +65,32 @@ impl Par2ParsedSet {
                     main = Some(Parsed {
                         recovery_set_id: packet.header.recovery_set_id,
                         expected_md5: packet.header.expected_md5,
-                        computed_md5,
+                        computed_md5: packet.header.computed_md5,
                         data,
                     });
                 }
                 Par2PacketBody::FileDesc(data) => file_descriptions.push(Parsed {
                     recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
-                    computed_md5,
+                    computed_md5: packet.header.computed_md5,
                     data,
                 }),
                 Par2PacketBody::SliceChecksum(data) => slice_checksums.push(Parsed {
                     recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
-                    computed_md5,
+                    computed_md5: packet.header.computed_md5,
                     data,
                 }),
                 Par2PacketBody::RecoverySlice(data) => recovery_slices.push(Parsed {
                     recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
-                    computed_md5,
+                    computed_md5: packet.header.computed_md5,
                     data,
                 }),
                 Par2PacketBody::Creator(data) => creators.push(Parsed {
                     recovery_set_id: packet.header.recovery_set_id,
                     expected_md5: packet.header.expected_md5,
-                    computed_md5,
+                    computed_md5: packet.header.computed_md5,
                     data,
                 }),
                 Par2PacketBody::Unknown(packet_type) => {
@@ -291,7 +286,7 @@ mod tests {
                 header: Par2PacketHeader {
                     packet_length: 64,
                     expected_md5: Par2Md5Hash(md5.0),
-                    computed_md5: Some(Par2Md5Hash(md5.0)),
+                    computed_md5: Par2Md5Hash(md5.0),
                     recovery_set_id,
                     packet_type: *packet_type,
                 },
@@ -429,18 +424,6 @@ mod tests {
             }
 
             #[test]
-            fn missing_computed_md5() {
-                let mut packets = make_minimal_valid_set();
-
-                // Remove the computed MD5 from the first packet
-                packets[0].header.computed_md5 = None;
-
-                let result = Par2ParsedSet::from_packets(packets);
-
-                assert!(matches!(result, Err(Par2Error::MissingComputedMD5)));
-            }
-
-            #[test]
             fn unknown_packet_type_produces_warning() {
                 let recovery_set_id = Par2RecoverySetId([0x01; 16]);
                 let mut packets = make_minimal_valid_set();
@@ -519,7 +502,7 @@ mod tests {
             #[test]
             fn conflicting_main_packet_computed_md5_fails() {
                 let mut other_main_packet = make_minimal_main(Par2RecoverySetId([0x01; 16]));
-                other_main_packet.header.computed_md5 = Some(Par2Md5Hash([0xDD; 16]));
+                other_main_packet.header.computed_md5 = Par2Md5Hash([0xDD; 16]);
 
                 let mut packets = make_minimal_valid_set();
                 packets.push(other_main_packet);
@@ -630,7 +613,7 @@ mod tests {
                         header: Par2PacketHeader {
                             packet_length: 64,
                             expected_md5: Par2Md5Hash([0x20; 16]),
-                            computed_md5: Some(Par2Md5Hash([0xFF; 16])),
+                            computed_md5: Par2Md5Hash([0xFF; 16]),
                             recovery_set_id,
                             packet_type: *PAR2_PACKET_MAGIC_FILE_DESC,
                         },
@@ -694,7 +677,7 @@ mod tests {
                         header: Par2PacketHeader {
                             packet_length: 64,
                             expected_md5: Par2Md5Hash([0x30; 16]),
-                            computed_md5: Some(Par2Md5Hash([0xFF; 16])),
+                            computed_md5: Par2Md5Hash([0xFF; 16]),
                             recovery_set_id,
                             packet_type: *PAR2_PACKET_MAGIC_SLICE_CHECKSUM,
                         },
@@ -758,7 +741,7 @@ mod tests {
                         header: Par2PacketHeader {
                             packet_length: 64,
                             expected_md5: Par2Md5Hash([0x50; 16]),
-                            computed_md5: Some(Par2Md5Hash([0xFF; 16])),
+                            computed_md5: Par2Md5Hash([0xFF; 16]),
                             recovery_set_id,
                             packet_type: *PAR2_PACKET_MAGIC_RECOVERY_SLICE,
                         },

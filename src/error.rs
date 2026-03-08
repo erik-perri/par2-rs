@@ -9,7 +9,6 @@ pub enum Par2Error {
     Io(std::io::Error),
     MainPacketConflict,
     MainPacketIntegrityFailure,
-    MissingComputedMD5,
     MissingFileDescriptions,
     MissingMainPacket,
     MissingSliceChecksums,
@@ -40,7 +39,6 @@ impl std::fmt::Display for Par2Error {
                 write!(f, "A conflicting main packet was found")
             }
             Par2Error::MainPacketIntegrityFailure => write!(f, "Main packet integrity failure"),
-            Par2Error::MissingComputedMD5 => write!(f, "Missing computed MD5"),
             Par2Error::MissingFileDescriptions => write!(f, "Missing file descriptions"),
             Par2Error::MissingMainPacket => write!(f, "Missing main packet"),
             Par2Error::MissingSliceChecksums => write!(f, "Missing slice checksums"),

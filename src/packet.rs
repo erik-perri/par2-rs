@@ -77,7 +77,7 @@ pub struct Par2Packet {
 pub struct Par2PacketHeader {
     pub(crate) packet_length: u64,
     pub(crate) expected_md5: Par2Md5Hash,
-    pub(crate) computed_md5: Option<Par2Md5Hash>,
+    pub(crate) computed_md5: Par2Md5Hash,
     pub(crate) recovery_set_id: Par2RecoverySetId,
     pub(crate) packet_type: Par2PacketType,
 }
@@ -155,46 +155,22 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
 
         let header_offset = offset + relative_offset;
 
-        let mut header = parse_header(&file_data[header_offset..]).map_err(|e| {
+        let header = parse_header(&file_data[header_offset..]).map_err(|e| {
             Par2Error::ParseError(format!(
                 "Failed to parse header at offset [{}]: {}",
                 header_offset, e
             ))
         })?;
 
-        // The packet length must be large enough to contain the entire header.
-        if header.packet_length < PAR2_HEADER_SIZE as u64 {
-            return Err(Par2Error::ParseError(format!(
-                "Header packet length [{}] is less than minimum required [{}]",
-                header.packet_length, PAR2_HEADER_SIZE,
-            )));
-        }
-
-        let header_hash_start_position = header_offset + PAR2_HASH_START_OFFSET;
-        let header_hash_end_position = header_offset.saturating_add(header.packet_length as usize);
-
-        if header_hash_end_position > file_size {
-            return Err(Par2Error::ParseError(format!(
-                "Header hash end position [{}] exceeds file size [{}]",
-                header_hash_end_position, file_size
-            )));
-        }
-
-        let computed_header_md5 = Par2Md5Hash(
-            Md5::digest(&file_data[header_hash_start_position..header_hash_end_position]).into(),
-        );
-
-        header.computed_md5 = Some(computed_header_md5);
-
-        let header_packet_length = header.packet_length as usize;
+        let packet_length = header.packet_length as usize;
 
         println!(
             "Parsed header at [{}], length {}",
-            header_offset, header_packet_length
+            header_offset, packet_length
         );
 
         let body_offset = header_offset + PAR2_HEADER_SIZE;
-        let body_bytes = &file_data[body_offset..header_offset + header_packet_length];
+        let body_bytes = &file_data[body_offset..header_offset + packet_length];
 
         let body = parse_body(&header.packet_type, body_bytes).map_err(|e| {
             Par2Error::ParseError(format!(
@@ -212,7 +188,7 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
         packets.push(Par2Packet { header, body });
 
         // Move to the next packet
-        offset = header_offset + header_packet_length;
+        offset = header_offset + packet_length;
     }
 
     Ok(packets)
@@ -250,10 +226,33 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
         .read_exact(&mut packet_type)
         .map_err(|e| Par2Error::ParseError(format!("Failed to read packet type: {}", e)))?;
 
+    // The packet length must be large enough to contain the entire header.
+    if packet_length < PAR2_HEADER_SIZE as u64 {
+        return Err(Par2Error::ParseError(format!(
+            "Packet length [{}] is less than minimum required [{}]",
+            packet_length, PAR2_HEADER_SIZE,
+        )));
+    }
+
+    let header_hash_start_position = PAR2_HASH_START_OFFSET;
+    let header_hash_end_position = packet_length as usize;
+    let data_size = data.len();
+
+    if header_hash_end_position > data_size {
+        return Err(Par2Error::ParseError(format!(
+            "Header hash end position [{}] exceeds length [{}]",
+            header_hash_end_position, data_size
+        )));
+    }
+
+    let computed_md5 = Par2Md5Hash(
+        Md5::digest(&data[header_hash_start_position..header_hash_end_position]).into(),
+    );
+
     Ok(Par2PacketHeader {
         packet_length,
         expected_md5,
-        computed_md5: None,
+        computed_md5,
         recovery_set_id,
         packet_type,
     })
@@ -489,7 +488,7 @@ mod tests {
             recovery_set_id: Par2RecoverySetId,
             packet_type: Par2PacketType,
             magic_bytes: Option<&[u8]>,
-        ) -> [u8; 64] {
+        ) -> Vec<u8> {
             let mut cursor = Cursor::new(Vec::new());
 
             cursor
@@ -500,13 +499,20 @@ mod tests {
             cursor.write_all(recovery_set_id.as_ref()).unwrap();
             cursor.write_all(packet_type.as_ref()).unwrap();
 
-            cursor.into_inner().try_into().unwrap()
+            // Pad to at least packet_length bytes so the MD5 computation has enough data
+            let mut data = cursor.into_inner();
+            let min_size = packet_length as usize;
+            if data.len() < min_size {
+                data.resize(min_size, 0);
+            }
+
+            data
         }
 
         #[test]
         fn parses_header() {
             let header_bytes = build_header_bytes(
-                1234,
+                64,
                 Par2Md5Hash([0xAA; 16]),
                 Par2RecoverySetId([0xBB; 16]),
                 [0xCC; 16],
@@ -515,7 +521,7 @@ mod tests {
 
             let parsed_header = parse_header(&header_bytes).unwrap();
 
-            assert_eq!(parsed_header.packet_length, 1234);
+            assert_eq!(parsed_header.packet_length, 64);
             assert_eq!(parsed_header.expected_md5, Par2Md5Hash([0xAA; 16]));
             assert_eq!(parsed_header.recovery_set_id, Par2RecoverySetId([0xBB; 16]));
             assert_eq!(parsed_header.packet_type, [0xCC; 16]);
