@@ -446,21 +446,8 @@ fn parse_creator(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 }
 
 fn find_next_header_offset(data: &[u8]) -> Option<usize> {
-    let mut offset = 0;
-    let total_size = data.len();
-    let magic_size = PAR2_PACKET_MAGIC_HEADER.len();
-
-    while offset + magic_size <= total_size {
-        let magic_bytes = &data[offset..offset + magic_size];
-
-        if magic_bytes == PAR2_PACKET_MAGIC_HEADER {
-            return Some(offset);
-        }
-
-        offset += 1;
-    }
-
-    None
+    data.windows(PAR2_PACKET_MAGIC_HEADER.len())
+        .position(|w| w == PAR2_PACKET_MAGIC_HEADER)
 }
 
 fn trim_trailing_null_bytes(data: &[u8]) -> Vec<u8> {
