@@ -56,6 +56,7 @@ pub fn verify_set(set: Par2ValidatedSet, base_path: &Path) -> Par2VerifiedSet {
     let mut results = Vec::new();
 
     for file_description in set.file_descriptions.into_values() {
+        // TODO Join Path::new(file_name).file_name() to strip paths
         let file_path = base_path.join(file_description.file_name);
 
         if !file_path.is_file() {
