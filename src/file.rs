@@ -29,7 +29,12 @@ pub fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
         "Unable to convert pattern path to string".into(),
     ))?;
 
-    let additional_files = glob::glob(pattern).map_err(|e| {
+    let options = glob::MatchOptions {
+        case_sensitive: false,
+        require_literal_separator: false,
+        require_literal_leading_dot: false,
+    };
+    let additional_files = glob::glob_with(pattern, options).map_err(|e| {
         Par2Error::FilePathError(format!("Failed to glob pattern '{}': {}", pattern, e))
     })?;
 
@@ -120,5 +125,18 @@ mod tests {
         let result = locate_files(&temp_dir.path().join("backup[2024.par2")).unwrap();
 
         assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn with_case_differences_in_filenames() {
+        let temp_dir = TempDir::new().unwrap();
+
+        File::create(temp_dir.path().join("backup.par2")).unwrap();
+        File::create(temp_dir.path().join("backup.vol000+01.PAR2")).unwrap();
+        File::create(temp_dir.path().join("backup.vol000+02.Par2")).unwrap();
+
+        let result = locate_files(&temp_dir.path().join("backup.par2")).unwrap();
+
+        assert_eq!(result.len(), 3);
     }
 }
