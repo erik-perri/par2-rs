@@ -52,7 +52,7 @@ impl Par2ParsedSet {
                     if let Some(main) = main.as_ref() {
                         if main.expected_md5 != packet.header.expected_md5
                             || main.computed_md5 != packet.header.computed_md5
-                            || packet.header.recovery_set_id != recovery_set_id.unwrap()
+                            || main.recovery_set_id != packet.header.recovery_set_id
                         {
                             return Err(Par2Error::MainPacketConflict);
                         }
