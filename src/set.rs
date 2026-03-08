@@ -137,6 +137,12 @@ impl Par2ParsedSet {
             return Err(Par2Error::MainPacketIntegrityFailure);
         }
 
+        if self.main.data.slice_size == 0 {
+            return Err(Par2Error::InvalidMainPacket(
+                "Slice size cannot be zero".to_string(),
+            ));
+        }
+
         let mut warnings = self.warnings;
 
         let valid_file_descriptions = validate_and_filter(
