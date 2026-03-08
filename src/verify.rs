@@ -48,6 +48,7 @@ pub(crate) enum Par2FileVerificationResult {
 #[derive(Debug)]
 pub(crate) enum Par2VerificationSliceStatus {
     Corrupt,
+    Missing,
     Valid,
 }
 
@@ -100,18 +101,22 @@ pub fn verify_set(set: Par2ValidatedSet, base_path: &Path) -> Par2VerifiedSet {
         );
 
         let mut slice_statuses = Vec::new();
+        let expected_count = file_checksums.entries.len();
+        let computed_count = computed_checksums.computed_slice_checksums.len();
 
-        for i in 0..file_checksums.entries.len() {
+        for i in 0..expected_count.min(computed_count) {
             let file_checksum = &file_checksums.entries[i];
             let computed_checksum = &computed_checksums.computed_slice_checksums[i];
 
-            if file_checksum.crc32 != computed_checksum.crc32
-                || file_checksum.md5 != computed_checksum.md5
-            {
+            if file_checksum != computed_checksum {
                 slice_statuses.push(Par2VerificationSliceStatus::Corrupt);
             } else {
                 slice_statuses.push(Par2VerificationSliceStatus::Valid);
             }
+        }
+
+        for _ in computed_count..expected_count {
+            slice_statuses.push(Par2VerificationSliceStatus::Missing);
         }
 
         results.push(Par2FileVerificationResult::Found {
