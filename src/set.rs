@@ -184,14 +184,14 @@ impl Par2ParsedSet {
             valid_slice_checksums,
             &mut warnings,
             |sc| sc.file_id,
-            |file_id| Par2Warning::UnexpectedSliceData(file_id),
+            Par2Warning::UnexpectedSliceData,
         );
 
         let file_descriptions = dedup_by_file_id(
             valid_file_descriptions,
             &mut warnings,
             |fd| fd.file_id,
-            |file_id| Par2Warning::UnexpectedFileDescription(file_id),
+            Par2Warning::UnexpectedFileDescription,
         );
 
         Ok(Par2ValidatedSet {

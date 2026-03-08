@@ -2,10 +2,10 @@ mod error;
 mod file;
 mod packet;
 mod set;
+mod verify;
 
 use crate::set::Par2ParsedSet;
-use std::path::Path;
-use std::{env, process};
+use std::{env, fs, process};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -15,8 +15,16 @@ fn main() {
         process::exit(1);
     }
 
-    let primary_file = Path::new(args.get(1).unwrap());
-    let file_paths = file::locate_files(primary_file).unwrap_or_else(|e| {
+    let arg = args.get(1).unwrap();
+    let primary_file = match fs::canonicalize(arg) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("\"{}\" is not a valid file: {}", arg, e);
+            process::exit(1);
+        }
+    };
+
+    let file_paths = file::locate_files(&primary_file).unwrap_or_else(|e| {
         println!("Failed to locate files: {}", e);
         process::exit(1);
     });
@@ -49,5 +57,11 @@ fn main() {
         process::exit(1);
     });
 
-    println!("{:#?}", validated_set);
+    let base_path = primary_file
+        .parent()
+        .expect("canonicalized path should always have a parent");
+
+    let verified_set = verify::verify_set(validated_set, base_path);
+
+    println!("{:#?}", verified_set);
 }
