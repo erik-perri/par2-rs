@@ -15,7 +15,7 @@ fn main() {
         process::exit(1);
     }
 
-    let arg = args.get(1).unwrap();
+    let arg = &args[1];
     let primary_file = match fs::canonicalize(arg) {
         Ok(p) => p,
         Err(e) => {
