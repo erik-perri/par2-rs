@@ -134,7 +134,7 @@ impl Par2ParsedSet {
 
         if self.main.data.slice_size == 0 {
             return Err(Par2Error::InvalidMainPacket(
-                "Slice size cannot be zero".to_string(),
+                "slice size is zero".to_string(),
             ));
         }
 

@@ -23,26 +23,24 @@ impl From<std::io::Error> for Par2Error {
 
 impl From<std::str::Utf8Error> for Par2Error {
     fn from(err: std::str::Utf8Error) -> Self {
-        Par2Error::ParseError(format!("Invalid UTF-8 encoding: {}", err))
+        Par2Error::ParseError(format!("invalid utf-8: {}", err))
     }
 }
 
 impl std::fmt::Display for Par2Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Par2Error::AllFileDescriptionsCorrupt => write!(f, "All file descriptions are corrupt"),
-            Par2Error::AllSliceChecksumsCorrupt => write!(f, "All slice checksums are corrupt"),
-            Par2Error::FilePathError(message) => write!(f, "File path error: {}", message),
-            Par2Error::InvalidMainPacket(message) => write!(f, "Invalid main packet: {}", message),
-            Par2Error::Io(err) => write!(f, "IO error: {}", err),
-            Par2Error::MainPacketConflict => {
-                write!(f, "A conflicting main packet was found")
-            }
-            Par2Error::MainPacketIntegrityFailure => write!(f, "Main packet integrity failure"),
-            Par2Error::MissingFileDescriptions => write!(f, "Missing file descriptions"),
-            Par2Error::MissingMainPacket => write!(f, "Missing main packet"),
-            Par2Error::MissingSliceChecksums => write!(f, "Missing slice checksums"),
-            Par2Error::ParseError(message) => write!(f, "Parse error: {}", message),
+            Par2Error::AllFileDescriptionsCorrupt => write!(f, "all file descriptions are corrupt"),
+            Par2Error::AllSliceChecksumsCorrupt => write!(f, "all slice checksums are corrupt"),
+            Par2Error::FilePathError(message) => write!(f, "{}", message),
+            Par2Error::InvalidMainPacket(message) => write!(f, "invalid main packet: {}", message),
+            Par2Error::Io(err) => write!(f, "{}", err),
+            Par2Error::MainPacketConflict => write!(f, "conflicting main packet"),
+            Par2Error::MainPacketIntegrityFailure => write!(f, "main packet integrity failure"),
+            Par2Error::MissingFileDescriptions => write!(f, "missing file descriptions"),
+            Par2Error::MissingMainPacket => write!(f, "missing main packet"),
+            Par2Error::MissingSliceChecksums => write!(f, "missing slice checksums"),
+            Par2Error::ParseError(message) => write!(f, "{}", message),
         }
     }
 }
@@ -80,21 +78,21 @@ pub enum Par2Warning {
 impl std::fmt::Display for Par2Warning {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Par2Warning::AllRecoverySlicesCorrupt => write!(f, "All recovery slices are corrupt"),
+            Par2Warning::AllRecoverySlicesCorrupt => write!(f, "all recovery slices are corrupt"),
             Par2Warning::IntegrityFailure(data_type, expected, actual) => {
                 write!(
                     f,
-                    "Integrity failure for {}: expected {}, actual {}",
+                    "integrity failure for {}: expected {}, got {}",
                     data_type,
                     hex::encode(expected),
                     hex::encode(actual)
                 )
             }
-            Par2Warning::MissingCreator => write!(f, "Missing creator"),
+            Par2Warning::MissingCreator => write!(f, "missing creator"),
             Par2Warning::UnexpectedRecoverySetId(data_type, expected, actual) => {
                 write!(
                     f,
-                    "Mismatched recovery set ID for {}: expected {}, actual {}",
+                    "mismatched recovery set id for {}: expected {}, got {}",
                     data_type,
                     hex::encode(expected),
                     hex::encode(actual)
@@ -103,15 +101,15 @@ impl std::fmt::Display for Par2Warning {
             Par2Warning::UnexpectedFileDescription(file_id) => {
                 write!(
                     f,
-                    "Unexpected file description for file {}",
+                    "unexpected file description for file {}",
                     hex::encode(file_id)
                 )
             }
             Par2Warning::UnexpectedSliceData(file_id) => {
-                write!(f, "Unexpected slice data for file {}", hex::encode(file_id))
+                write!(f, "unexpected slice data for file {}", hex::encode(file_id))
             }
             Par2Warning::UnknownPacketType(packet_type) => {
-                write!(f, "Unknown packet type {}", hex::encode(packet_type))
+                write!(f, "unknown packet type {}", hex::encode(packet_type))
             }
         }
     }

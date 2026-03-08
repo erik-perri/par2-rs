@@ -13,20 +13,20 @@ pub fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
 
     let parent_path = base
         .parent()
-        .ok_or(Par2Error::FilePathError("Missing parent directory".into()))?;
+        .ok_or(Par2Error::FilePathError("missing parent directory".into()))?;
 
     let base_file_stem = base
         .file_stem()
-        .ok_or(Par2Error::FilePathError("Missing file stem".into()))?
+        .ok_or(Par2Error::FilePathError("missing file stem".into()))?
         .to_str()
         .ok_or(Par2Error::FilePathError(
-            "Unable to convert file stem to string".into(),
+            "file stem is not valid utf-8".into(),
         ))?;
 
     let escaped_stem = glob::Pattern::escape(base_file_stem);
     let pattern_path = Path::join(parent_path, format!("{}.vol*.par2", escaped_stem));
     let pattern = pattern_path.to_str().ok_or(Par2Error::FilePathError(
-        "Unable to convert pattern path to string".into(),
+        "pattern path is not valid utf-8".into(),
     ))?;
 
     let options = glob::MatchOptions {
@@ -35,7 +35,7 @@ pub fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
         require_literal_leading_dot: false,
     };
     let additional_files = glob::glob_with(pattern, options).map_err(|e| {
-        Par2Error::FilePathError(format!("Failed to glob pattern '{}': {}", pattern, e))
+        Par2Error::FilePathError(format!("invalid glob pattern '{}': {}", pattern, e))
     })?;
 
     for entry in additional_files {

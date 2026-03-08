@@ -1,3 +1,4 @@
+use crate::error::Par2Error;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData, Par2SliceChecksumEntry};
 use crate::set::Par2ValidatedSet;
 use byteorder::{LittleEndian, WriteBytesExt};
@@ -39,7 +40,7 @@ pub(crate) enum Par2FileVerificationResult {
         file_path: PathBuf,
     },
     Unreadable {
-        error: String,
+        error: Par2Error,
         file_id: Par2FileId,
         file_path: PathBuf,
     },
@@ -146,18 +147,21 @@ struct Par2FileChecksums {
     file_md5: Par2Md5Hash,
 }
 
-fn compute_file_checksums(file_path: &Path, slice_size: u64) -> Result<Par2FileChecksums, String> {
-    let file_metadata = file_path
-        .metadata()
-        .map_err(|e| format!("Failed to get file metadata: {}", e))?;
+fn compute_file_checksums(
+    file_path: &Path,
+    slice_size: u64,
+) -> Result<Par2FileChecksums, Par2Error> {
+    let file_metadata = file_path.metadata()?;
 
     let file_name = file_path
         .file_name()
         .and_then(|name| name.to_str())
-        .ok_or_else(|| "File path is missing or contains invalid UTF-8".to_string())?;
+        .ok_or_else(|| {
+            Par2Error::FilePathError("file path is missing or not valid utf-8".into())
+        })?;
 
     let file_length = file_metadata.len();
-    let file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
+    let file = File::open(file_path)?;
 
     let first_16kb_size = (16 * 1024).min(file_length);
 
@@ -165,13 +169,9 @@ fn compute_file_checksums(file_path: &Path, slice_size: u64) -> Result<Par2FileC
     let mut slice_buffer = vec![0u8; slice_size as usize];
     let mut first_16kb_buffer = vec![0u8; first_16kb_size as usize];
 
-    reader
-        .read_exact(&mut first_16kb_buffer)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
+    reader.read_exact(&mut first_16kb_buffer)?;
 
-    reader
-        .seek(SeekFrom::Start(0))
-        .map_err(|e| format!("Failed to seek file: {}", e))?;
+    reader.seek(SeekFrom::Start(0))?;
 
     let first_16kb_md5 = Par2Md5Hash(Md5::digest(&first_16kb_buffer).into());
 
@@ -183,8 +183,7 @@ fn compute_file_checksums(file_path: &Path, slice_size: u64) -> Result<Par2FileC
 
         let read_length = (&mut reader)
             .take(slice_size)
-            .read_to_end(&mut slice_buffer)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+            .read_to_end(&mut slice_buffer)?;
 
         if read_length == 0 {
             break;

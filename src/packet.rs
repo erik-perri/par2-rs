@@ -156,10 +156,7 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
         let header_offset = offset + relative_offset;
 
         let header = parse_header(&file_data[header_offset..]).map_err(|e| {
-            Par2Error::ParseError(format!(
-                "Failed to parse header at offset [{}]: {}",
-                header_offset, e
-            ))
+            Par2Error::ParseError(format!("invalid header at offset {}: {}", header_offset, e))
         })?;
 
         let packet_length = header.packet_length as usize;
@@ -173,10 +170,7 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
         let body_bytes = &file_data[body_offset..header_offset + packet_length];
 
         let body = parse_body(&header.packet_type, body_bytes).map_err(|e| {
-            Par2Error::ParseError(format!(
-                "Failed to parse body at offset [{}]: {}",
-                header_offset, e
-            ))
+            Par2Error::ParseError(format!("invalid body at offset {}: {}", header_offset, e))
         })?;
 
         println!(
@@ -202,34 +196,34 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
 
     if magic_bytes != PAR2_PACKET_MAGIC_HEADER {
         return Err(Par2Error::ParseError(format!(
-            "Invalid magic bytes: {:?}",
+            "invalid magic bytes: {:?}",
             magic_bytes
         )));
     }
 
     let packet_length = cursor
         .read_u64::<LittleEndian>()
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read packet length: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated packet length: {}", e)))?;
 
     let mut expected_md5: Par2Md5Hash = Par2Md5Hash([0; 16]);
     cursor
         .read_exact(expected_md5.as_mut())
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read MD5: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated md5: {}", e)))?;
 
     let mut recovery_set_id: Par2RecoverySetId = Par2RecoverySetId([0; 16]);
     cursor
         .read_exact(recovery_set_id.as_mut())
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read recovery set ID: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated recovery set id: {}", e)))?;
 
     let mut packet_type: Par2PacketType = [0; 16];
     cursor
         .read_exact(&mut packet_type)
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read packet type: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated packet type: {}", e)))?;
 
     // The packet length must be large enough to contain the entire header.
     if packet_length < PAR2_HEADER_SIZE as u64 {
         return Err(Par2Error::ParseError(format!(
-            "Packet length [{}] is less than minimum required [{}]",
+            "packet length {} is less than minimum {}",
             packet_length, PAR2_HEADER_SIZE,
         )));
     }
@@ -240,7 +234,7 @@ fn parse_header(data: &[u8]) -> Result<Par2PacketHeader, Par2Error> {
 
     if header_hash_end_position > data_size {
         return Err(Par2Error::ParseError(format!(
-            "Header hash end position [{}] exceeds length [{}]",
+            "packet length {} exceeds available data {}",
             header_hash_end_position, data_size
         )));
     }
@@ -274,18 +268,18 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 
     let slice_size = cursor
         .read_u64::<LittleEndian>()
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read slice size: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated slice size: {}", e)))?;
 
     let file_count = cursor
         .read_u32::<LittleEndian>()
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read file count: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated file count: {}", e)))?;
 
     let required_bytes = (file_count as u64).saturating_mul(16);
     let remaining_bytes = cursor.get_ref().len() as u64 - cursor.position();
 
     if required_bytes > remaining_bytes {
         return Err(Par2Error::ParseError(format!(
-            "File count {} exceeds available data",
+            "file count {} exceeds available data",
             file_count
         )));
     }
@@ -297,7 +291,7 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 
         cursor
             .read_exact(file_id.as_mut())
-            .map_err(|e| Par2Error::ParseError(format!("Failed to read file ID: {}", e)))?;
+            .map_err(|e| Par2Error::ParseError(format!("truncated file id: {}", e)))?;
 
         recovery_file_ids.push(file_id);
     }
@@ -305,7 +299,7 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let remaining_bytes = cursor.get_ref().len() as u64 - cursor.position();
     if !remaining_bytes.is_multiple_of(16) {
         return Err(Par2Error::ParseError(format!(
-            "Found {} bytes remaining after reading recovery file IDs, expected 16 bytes per verification file ID",
+            "{} trailing bytes after recovery file ids, expected multiple of 16",
             remaining_bytes
         )));
     }
@@ -315,9 +309,9 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 
     for _ in 0..non_recovery_file_count {
         let mut file_id: Par2FileId = Par2FileId([0; 16]);
-        cursor.read_exact(file_id.as_mut()).map_err(|e| {
-            Par2Error::ParseError(format!("Failed to read verification file ID: {}", e))
-        })?;
+        cursor
+            .read_exact(file_id.as_mut())
+            .map_err(|e| Par2Error::ParseError(format!("truncated non-recovery file id: {}", e)))?;
 
         non_recovery_file_ids.push(file_id);
     }
@@ -339,38 +333,35 @@ fn parse_file_description(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut file_id: Par2FileId = Par2FileId([0; 16]);
     cursor
         .read_exact(file_id.as_mut())
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file ID: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated file description file id: {}", e)))?;
 
     let mut file_md5: Par2Md5Hash = Par2Md5Hash([0; 16]);
     cursor
         .read_exact(file_md5.as_mut())
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file MD5: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated file description md5: {}", e)))?;
 
     let mut file_first_16kb_md5: Par2Md5Hash = Par2Md5Hash([0; 16]);
     cursor
         .read_exact(file_first_16kb_md5.as_mut())
         .map_err(|e| {
-            Par2Error::ParseError(format!(
-                "Failed to read FileDesc file first 16KB MD5: {}",
-                e
-            ))
+            Par2Error::ParseError(format!("truncated file description first 16kb md5: {}", e))
         })?;
 
-    let file_length = cursor.read_u64::<LittleEndian>().map_err(|e| {
-        Par2Error::ParseError(format!("Failed to read FileDesc file length: {}", e))
-    })?;
+    let file_length = cursor
+        .read_u64::<LittleEndian>()
+        .map_err(|e| Par2Error::ParseError(format!("truncated file description length: {}", e)))?;
 
     let mut parsed_name = vec![0; data.len() - cursor.position() as usize];
     cursor
         .read_exact(&mut parsed_name)
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read FileDesc file name: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated file description name: {}", e)))?;
 
     let file_name_bytes = trim_trailing_null_bytes(&parsed_name);
     let file_name = match String::from_utf8(file_name_bytes.to_vec()) {
         Ok(name) => name,
         Err(_) => {
             return Err(Par2Error::ParseError(
-                "Failed to decode FileDesc file name as UTF-8".to_string(),
+                "file description name is not valid utf-8".to_string(),
             ));
         }
     };
@@ -390,11 +381,13 @@ fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut file_id: Par2FileId = Par2FileId([0; 16]);
     cursor
         .read_exact(file_id.as_mut())
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read IFSC file ID: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated slice checksum file id: {}", e)))?;
 
     let entry_bytes = cursor.get_ref().len() - cursor.position() as usize;
     if !entry_bytes.is_multiple_of(20) {
-        return Err(Par2Error::ParseError("Invalid IFSC entry size".to_string()));
+        return Err(Par2Error::ParseError(
+            "invalid slice checksum entry size".to_string(),
+        ));
     }
 
     let entry_count = entry_bytes / 20;
@@ -404,11 +397,11 @@ fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         let mut md5: Par2Md5Hash = Par2Md5Hash([0; 16]);
         cursor
             .read_exact(md5.as_mut())
-            .map_err(|e| Par2Error::ParseError(format!("Failed to read IFSC entry MD5: {}", e)))?;
+            .map_err(|e| Par2Error::ParseError(format!("truncated slice checksum md5: {}", e)))?;
 
-        let crc32 = cursor.read_u32::<LittleEndian>().map_err(|e| {
-            Par2Error::ParseError(format!("Failed to read IFSC entry CRC32: {}", e))
-        })?;
+        let crc32 = cursor
+            .read_u32::<LittleEndian>()
+            .map_err(|e| Par2Error::ParseError(format!("truncated slice checksum crc32: {}", e)))?;
 
         entries.push(Par2SliceChecksumEntry { md5, crc32 });
     }
@@ -422,16 +415,16 @@ fn parse_slice_checksum(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 fn parse_recovery_slice(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
-    let exponent = cursor.read_u32::<LittleEndian>().map_err(|e| {
-        Par2Error::ParseError(format!("Failed to read recovery slice exponent: {}", e))
-    })?;
+    let exponent = cursor
+        .read_u32::<LittleEndian>()
+        .map_err(|e| Par2Error::ParseError(format!("truncated recovery slice exponent: {}", e)))?;
 
     let slice_size = cursor.get_ref().len() - cursor.position() as usize;
     let mut recovery_data = Vec::with_capacity(slice_size);
 
     cursor
         .read_to_end(&mut recovery_data)
-        .map_err(|e| Par2Error::ParseError(format!("Failed to read recovery slice data: {}", e)))?;
+        .map_err(|e| Par2Error::ParseError(format!("truncated recovery slice data: {}", e)))?;
 
     Ok(Par2PacketBody::RecoverySlice(Par2RecoverySliceData {
         exponent,
@@ -445,7 +438,7 @@ fn parse_creator(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
         Ok(name) => name,
         Err(_) => {
             return Err(Par2Error::ParseError(
-                "Failed to decode creator name as UTF-8".to_string(),
+                "creator name is not valid utf-8".to_string(),
             ));
         }
     };
