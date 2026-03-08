@@ -1,4 +1,4 @@
-use crate::packet::{Par2Md5Hash, Par2PacketType, Par2RecoverySetId};
+use crate::packet::{Par2FileId, Par2Md5Hash, Par2PacketType, Par2RecoverySetId};
 
 #[derive(Debug)]
 pub enum Par2Error {
@@ -69,9 +69,11 @@ impl std::fmt::Display for Par2WarningDataType {
 #[derive(Debug)]
 pub enum Par2Warning {
     AllRecoverySlicesCorrupt,
-    MissingCreator,
     IntegrityFailure(Par2WarningDataType, Par2Md5Hash, Par2Md5Hash),
+    MissingCreator,
+    UnexpectedFileDescription(Par2FileId),
     UnexpectedRecoverySetId(Par2WarningDataType, Par2RecoverySetId, Par2RecoverySetId),
+    UnexpectedSliceData(Par2FileId),
     UnknownPacketType(Par2PacketType),
 }
 
@@ -79,7 +81,6 @@ impl std::fmt::Display for Par2Warning {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Par2Warning::AllRecoverySlicesCorrupt => write!(f, "All recovery slices are corrupt"),
-            Par2Warning::MissingCreator => write!(f, "Missing creator"),
             Par2Warning::IntegrityFailure(data_type, expected, actual) => {
                 write!(
                     f,
@@ -89,6 +90,7 @@ impl std::fmt::Display for Par2Warning {
                     hex::encode(actual)
                 )
             }
+            Par2Warning::MissingCreator => write!(f, "Missing creator"),
             Par2Warning::UnexpectedRecoverySetId(data_type, expected, actual) => {
                 write!(
                     f,
@@ -97,6 +99,16 @@ impl std::fmt::Display for Par2Warning {
                     hex::encode(expected),
                     hex::encode(actual)
                 )
+            }
+            Par2Warning::UnexpectedFileDescription(file_id) => {
+                write!(
+                    f,
+                    "Unexpected file description for file {}",
+                    hex::encode(file_id)
+                )
+            }
+            Par2Warning::UnexpectedSliceData(file_id) => {
+                write!(f, "Unexpected slice data for file {}", hex::encode(file_id))
             }
             Par2Warning::UnknownPacketType(packet_type) => {
                 write!(f, "Unknown packet type {}", hex::encode(packet_type))

@@ -1,15 +1,17 @@
 use crate::error::{Par2Error, Par2Warning, Par2WarningDataType};
 use crate::packet::{
-    Par2CreatorData, Par2FileDescriptionData, Par2MainData, Par2Md5Hash, Par2Packet,
+    Par2CreatorData, Par2FileDescriptionData, Par2FileId, Par2MainData, Par2Md5Hash, Par2Packet,
     Par2PacketBody, Par2RecoverySetId, Par2RecoverySliceData, Par2SliceChecksumData,
 };
+use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 
 #[derive(Debug)]
 pub(crate) struct Parsed<T> {
-    pub(crate) recovery_set_id: Par2RecoverySetId,
-    pub(crate) expected_md5: Par2Md5Hash,
     pub(crate) computed_md5: Par2Md5Hash,
     pub(crate) data: T,
+    pub(crate) expected_md5: Par2Md5Hash,
+    pub(crate) recovery_set_id: Par2RecoverySetId,
 }
 
 #[derive(Debug)]
@@ -27,8 +29,8 @@ pub(crate) struct Par2ParsedSet {
 pub(crate) struct Par2ValidatedSet {
     pub(crate) recovery_set_id: Par2RecoverySetId,
     pub(crate) main: Par2MainData,
-    pub(crate) file_descriptions: Vec<Par2FileDescriptionData>,
-    pub(crate) slice_checksums: Vec<Par2SliceChecksumData>,
+    pub(crate) file_descriptions: HashMap<Par2FileId, Par2FileDescriptionData>,
+    pub(crate) slice_checksums: HashMap<Par2FileId, Par2SliceChecksumData>,
     pub(crate) recovery_slices: Vec<Par2RecoverySliceData>,
     pub(crate) creators: Vec<Par2CreatorData>,
     pub(crate) warnings: Vec<Par2Warning>,
@@ -178,11 +180,25 @@ impl Par2ParsedSet {
             return Err(Par2Error::AllFileDescriptionsCorrupt);
         }
 
+        let slice_checksums = dedup_by_file_id(
+            valid_slice_checksums,
+            &mut warnings,
+            |sc| sc.file_id,
+            |file_id| Par2Warning::UnexpectedSliceData(file_id),
+        );
+
+        let file_descriptions = dedup_by_file_id(
+            valid_file_descriptions,
+            &mut warnings,
+            |fd| fd.file_id,
+            |file_id| Par2Warning::UnexpectedFileDescription(file_id),
+        );
+
         Ok(Par2ValidatedSet {
             recovery_set_id: self.recovery_set_id,
             main: self.main.data,
-            file_descriptions: valid_file_descriptions,
-            slice_checksums: valid_slice_checksums,
+            file_descriptions,
+            slice_checksums,
             recovery_slices: valid_recovery_slices,
             creators: valid_creators,
             warnings,
@@ -220,6 +236,35 @@ fn validate_and_filter<T>(
     }
 
     valid_data
+}
+
+fn dedup_by_file_id<T>(
+    items: Vec<T>,
+    warnings: &mut Vec<Par2Warning>,
+    file_id_extractor: impl Fn(&T) -> Par2FileId,
+    warning_builder: impl Fn(Par2FileId) -> Par2Warning,
+) -> HashMap<Par2FileId, T>
+where
+    T: PartialEq,
+{
+    let mut map: HashMap<Par2FileId, T> = HashMap::new();
+
+    for item in items {
+        let file_id = file_id_extractor(&item);
+
+        match map.entry(file_id) {
+            Entry::Occupied(existing) => {
+                if existing.get() != &item {
+                    warnings.push(warning_builder(file_id));
+                }
+            }
+            Entry::Vacant(slot) => {
+                slot.insert(item);
+            }
+        };
+    }
+
+    map
 }
 
 #[cfg(test)]

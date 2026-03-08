@@ -1,9 +1,10 @@
 use crate::error::Par2Error;
 use byteorder::{LittleEndian, ReadBytesExt};
 use md5::{Digest, Md5};
+use std::fmt::Display;
 use std::io::{Cursor, Read};
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct Par2FileId(pub(crate) [u8; 16]);
 
 impl AsMut<[u8]> for Par2FileId {
@@ -15,6 +16,18 @@ impl AsMut<[u8]> for Par2FileId {
 impl AsRef<[u8]> for Par2FileId {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl From<Par2Md5Hash> for Par2FileId {
+    fn from(hash: Par2Md5Hash) -> Self {
+        Self(hash.0)
+    }
+}
+
+impl Display for Par2FileId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", hex::encode(self.0))
     }
 }
 
@@ -45,6 +58,12 @@ impl AsMut<[u8]> for Par2RecoverySetId {
 impl AsRef<[u8]> for Par2RecoverySetId {
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+impl From<Par2Md5Hash> for Par2RecoverySetId {
+    fn from(hash: Par2Md5Hash) -> Self {
+        Self(hash.0)
     }
 }
 
@@ -81,7 +100,7 @@ pub struct Par2MainData {
     pub(crate) slice_size: u64,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Par2FileDescriptionData {
     pub(crate) file_id: Par2FileId,
     pub(crate) file_md5: Par2Md5Hash,
@@ -90,13 +109,13 @@ pub struct Par2FileDescriptionData {
     pub(crate) file_name: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Par2SliceChecksumData {
     pub(crate) file_id: Par2FileId,
     pub(crate) entries: Vec<Par2SliceChecksumEntry>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Par2SliceChecksumEntry {
     pub(crate) md5: Par2Md5Hash,
     pub(crate) crc32: u32,
@@ -254,8 +273,6 @@ fn parse_body(packet_type: &Par2PacketType, data: &[u8]) -> Result<Par2PacketBod
 fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
     let mut cursor = Cursor::new(data);
 
-    let computed_recovery_set_id: Par2RecoverySetId = Par2RecoverySetId(Md5::digest(data).into());
-
     let slice_size = cursor
         .read_u64::<LittleEndian>()
         .map_err(|e| Par2Error::ParseError(format!("Failed to read slice size: {}", e)))?;
@@ -305,6 +322,9 @@ fn parse_body_main(data: &[u8]) -> Result<Par2PacketBody, Par2Error> {
 
         non_recovery_file_ids.push(file_id);
     }
+
+    let body_md5 = Par2Md5Hash(Md5::digest(data).into());
+    let computed_recovery_set_id = Par2RecoverySetId::from(body_md5);
 
     Ok(Par2PacketBody::Main(Par2MainData {
         computed_recovery_set_id,
