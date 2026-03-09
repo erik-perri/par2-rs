@@ -4,8 +4,14 @@ use md5::{Digest, Md5};
 use std::fmt::Display;
 use std::io::{Cursor, Read};
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct Par2FileId(pub(crate) [u8; 16]);
+
+impl std::fmt::Debug for Par2FileId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Par2FileId({})", hex::encode(self.0))
+    }
+}
 
 impl AsMut<[u8]> for Par2FileId {
     fn as_mut(&mut self) -> &mut [u8] {
@@ -31,8 +37,14 @@ impl Display for Par2FileId {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Par2Md5Hash(pub(crate) [u8; 16]);
+
+impl std::fmt::Debug for Par2Md5Hash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Par2Md5Hash({})", hex::encode(self.0))
+    }
+}
 
 impl AsMut<[u8]> for Par2Md5Hash {
     fn as_mut(&mut self) -> &mut [u8] {
@@ -46,7 +58,7 @@ impl AsRef<[u8]> for Par2Md5Hash {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Par2RecoverySetId(pub(crate) [u8; 16]);
 
 impl AsMut<[u8]> for Par2RecoverySetId {
@@ -64,6 +76,12 @@ impl AsRef<[u8]> for Par2RecoverySetId {
 impl From<Par2Md5Hash> for Par2RecoverySetId {
     fn from(hash: Par2Md5Hash) -> Self {
         Self(hash.0)
+    }
+}
+
+impl std::fmt::Debug for Par2RecoverySetId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Par2RecoverySetId({})", hex::encode(self.0))
     }
 }
 
