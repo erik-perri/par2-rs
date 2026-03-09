@@ -1,10 +1,8 @@
 use crate::error::Par2Error;
+use crate::file;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData, Par2SliceChecksumEntry};
 use crate::set::Par2Set;
-use byteorder::{LittleEndian, WriteBytesExt};
-use md5::{Digest, Md5};
-use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
+use md5::Digest;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -69,7 +67,8 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
             continue;
         }
 
-        let computed_checksums = match compute_file_checksums(&file_path, set.main.slice_size) {
+        let computed_checksums = match file::compute_file_checksums(&file_path, set.main.slice_size)
+        {
             Ok(id) => id,
             Err(error) => {
                 results.push(Par2FileVerificationResult::Unreadable {
@@ -138,99 +137,4 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
         recovery_file_ids: set.main.recovery_file_ids,
         non_recovery_file_ids: set.main.non_recovery_file_ids,
     }
-}
-
-struct Par2FileChecksums {
-    computed_slice_checksums: Vec<Par2SliceChecksumEntry>,
-    file_id: Par2FileId,
-    file_length: u64,
-    file_md5: Par2Md5Hash,
-}
-
-fn compute_file_checksums(
-    file_path: &Path,
-    slice_size: u64,
-) -> Result<Par2FileChecksums, Par2Error> {
-    let file_metadata = file_path.metadata()?;
-
-    let file_name = file_path
-        .file_name()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| {
-            Par2Error::FilePathError("file path is missing or not valid utf-8".into())
-        })?;
-
-    let file_length = file_metadata.len();
-    let file = File::open(file_path)?;
-
-    let first_16kb_size = (16 * 1024).min(file_length);
-
-    let mut reader = BufReader::new(file);
-    let mut slice_buffer = vec![0u8; slice_size as usize];
-    let mut first_16kb_buffer = vec![0u8; first_16kb_size as usize];
-
-    reader.read_exact(&mut first_16kb_buffer)?;
-
-    reader.seek(SeekFrom::Start(0))?;
-
-    let first_16kb_md5 = Par2Md5Hash(Md5::digest(&first_16kb_buffer).into());
-
-    let mut file_md5_hasher = Md5::new();
-    let mut computed_slice_checksums = Vec::new();
-
-    loop {
-        slice_buffer.clear();
-
-        let read_length = (&mut reader)
-            .take(slice_size)
-            .read_to_end(&mut slice_buffer)?;
-
-        if read_length == 0 {
-            break;
-        }
-
-        file_md5_hasher.update(&slice_buffer[..read_length]);
-
-        let mut slice_md5_hasher = Md5::new();
-        let mut slice_crc32_hasher = crc32fast::Hasher::new();
-
-        let padding_length = (slice_size - (read_length as u64)) % slice_size;
-        let padding_buffer = vec![0; padding_length as usize];
-
-        slice_md5_hasher.update(&slice_buffer[..read_length]);
-        slice_md5_hasher.update(&padding_buffer);
-
-        slice_crc32_hasher.update(&slice_buffer[..read_length]);
-        slice_crc32_hasher.update(&padding_buffer);
-
-        let slice_md5 = Par2Md5Hash(slice_md5_hasher.finalize().into());
-        let slice_crc32 = slice_crc32_hasher.finalize();
-
-        computed_slice_checksums.push(Par2SliceChecksumEntry {
-            md5: slice_md5,
-            crc32: slice_crc32,
-        })
-    }
-
-    let file_md5 = Par2Md5Hash(file_md5_hasher.finalize().into());
-    let file_id = compute_file_id(file_name, file_length, &first_16kb_md5);
-
-    Ok(Par2FileChecksums {
-        computed_slice_checksums,
-        file_id,
-        file_length,
-        file_md5,
-    })
-}
-
-fn compute_file_id(file_name: &str, file_length: u64, first_16kb_md5: &Par2Md5Hash) -> Par2FileId {
-    let mut buffer = Vec::new();
-
-    buffer.extend_from_slice(first_16kb_md5.as_ref());
-    buffer.write_u64::<LittleEndian>(file_length).unwrap();
-    buffer.extend_from_slice(file_name.as_bytes());
-
-    let computed_file_id = Par2Md5Hash(Md5::digest(&buffer).into());
-
-    Par2FileId::from(computed_file_id)
 }
