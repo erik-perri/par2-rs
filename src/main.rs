@@ -21,9 +21,9 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Create {
-        #[arg(short = 's', long)]
+        #[arg(short = 's', long, default_value = "16")]
         block_size: u64,
-        #[arg(short = 'c', long)]
+        #[arg(short = 'c', long, default_value = "2")]
         recovery_block_count: u16,
         #[arg(required = true)]
         output: PathBuf,
