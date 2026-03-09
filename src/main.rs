@@ -43,7 +43,7 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    match cli.command {
+    let result = match cli.command {
         Commands::Create {
             block_size,
             recovery_block_count,
@@ -52,6 +52,11 @@ fn main() {
         } => cli::create(block_size, recovery_block_count, &output, &files),
         Commands::Verify { file } => cli::verify(&file),
         Commands::Repair { file } => cli::repair(&file),
+    };
+
+    if let Err(e) = result {
+        eprintln!("Error: {}", e);
+        process::exit(1);
     }
 
     process::exit(0);

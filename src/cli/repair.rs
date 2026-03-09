@@ -1,7 +1,6 @@
+use crate::error::Par2Error;
 use std::path::Path;
-use std::process;
 
-pub(crate) fn repair(_file: &Path) {
-    println!("not implemented");
-    process::exit(1);
+pub(crate) fn repair(_file: &Path) -> Result<(), Par2Error> {
+    Err(Par2Error::ParseError("not implemented".to_string()))
 }

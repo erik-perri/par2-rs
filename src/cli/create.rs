@@ -1,3 +1,4 @@
+use crate::error::Par2Error;
 use std::path::{Path, PathBuf};
 use std::process;
 
@@ -6,7 +7,6 @@ pub(crate) fn create(
     _recovery_block_count: u16,
     _output: &Path,
     _files: &[PathBuf],
-) {
-    println!("not implemented");
-    process::exit(1);
+) -> Result<(), Par2Error> {
+    Err(Par2Error::ParseError("not implemented".to_string()))
 }

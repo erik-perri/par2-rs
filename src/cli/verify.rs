@@ -1,9 +1,10 @@
+use crate::error::Par2Error;
 use crate::set::Par2ParsedSet;
 use crate::{file, packet, verify};
 use std::path::Path;
 use std::{fs, process};
 
-pub(crate) fn verify(path: &Path) {
+pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     let primary_file = match fs::canonicalize(path) {
         Ok(p) => p,
         Err(e) => {
@@ -52,4 +53,6 @@ pub(crate) fn verify(path: &Path) {
     let verified_set = verify::verify_set(validated_set, base_path);
 
     println!("{:#?}", verified_set);
+
+    Ok(())
 }
