@@ -1,5 +1,6 @@
 mod error;
 mod file;
+mod galois;
 mod packet;
 mod set;
 mod verify;
