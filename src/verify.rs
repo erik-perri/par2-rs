@@ -1,6 +1,6 @@
 use crate::error::Par2Error;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData, Par2SliceChecksumEntry};
-use crate::set::Par2ValidatedSet;
+use crate::set::Par2Set;
 use byteorder::{LittleEndian, WriteBytesExt};
 use md5::{Digest, Md5};
 use std::fs::File;
@@ -53,7 +53,7 @@ pub(crate) enum Par2VerificationSliceStatus {
     Valid,
 }
 
-pub fn verify_set(set: Par2ValidatedSet, base_path: &Path) -> Par2VerifiedSet {
+pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
     let mut results = Vec::new();
 
     for file_description in set.file_descriptions.into_values() {

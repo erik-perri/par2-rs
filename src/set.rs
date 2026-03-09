@@ -26,7 +26,7 @@ pub(crate) struct Par2ParsedSet {
 }
 
 #[derive(Debug)]
-pub(crate) struct Par2ValidatedSet {
+pub(crate) struct Par2Set {
     pub(crate) recovery_set_id: Par2RecoverySetId,
     pub(crate) main: Par2MainData,
     pub(crate) file_descriptions: HashMap<Par2FileId, Par2FileDescriptionData>,
@@ -125,7 +125,7 @@ impl Par2ParsedSet {
         })
     }
 
-    pub fn validate(self) -> Result<Par2ValidatedSet, Par2Error> {
+    pub fn validate(self) -> Result<Par2Set, Par2Error> {
         if self.main.computed_md5 != self.main.expected_md5
             || self.main.recovery_set_id != self.main.data.computed_recovery_set_id
         {
@@ -195,7 +195,7 @@ impl Par2ParsedSet {
             Par2Warning::UnexpectedFileDescription,
         );
 
-        Ok(Par2ValidatedSet {
+        Ok(Par2Set {
             recovery_set_id: self.recovery_set_id,
             main: self.main.data,
             file_descriptions,
