@@ -9,11 +9,11 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub(crate) struct Par2VerifiedSet {
-    results: Vec<Par2FileVerificationResult>,
+    pub(crate) results: Vec<Par2FileVerificationResult>,
     non_recovery_file_ids: Vec<Par2FileId>,
     recovery_file_ids: Vec<Par2FileId>,
     recovery_slices: Vec<Par2RecoverySliceData>,
-    slice_size: u64,
+    pub(crate) slice_size: u64,
 }
 
 #[derive(Debug)]
