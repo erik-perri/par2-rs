@@ -197,4 +197,42 @@ mod tests {
         let parsed_body = Par2FileDescriptionData::from_bytes(&body_bytes);
         assert!(matches!(parsed_body, Err(Par2Error::ParseError(_))));
     }
+
+    #[test]
+    fn to_bytes_matches_specification() {
+        let description = Par2FileDescriptionData {
+            file_md5: Par2Md5Hash([0x11; 16]),
+            file_first_16kb_md5: Par2Md5Hash([0x22; 16]),
+            file_length: 258, // 0x0102 in hex
+            file_name: "a.txt".to_string(),
+        };
+
+        let bytes = description.to_bytes().unwrap();
+
+        // 16 bytes for File ID (Computed internally by MD5, so we just check length/existence here,
+        // or calculate the exact expected MD5 hash of "a.txt" + length + 16k hash)
+        let expected_file_id = description.file_id();
+
+        let mut expected_bytes = Vec::new();
+
+        // 16 bytes
+        expected_bytes.extend_from_slice(expected_file_id.as_ref());
+
+        // 16 bytes (file_md5)
+        expected_bytes.extend_from_slice(&[0x11; 16]);
+
+        // 16 bytes (first 16k md5)
+        expected_bytes.extend_from_slice(&[0x22; 16]);
+
+        // 8 bytes (LittleEndian 258)
+        expected_bytes.extend_from_slice(&[0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+        // 5 bytes (Name)
+        expected_bytes.extend_from_slice(b"a.txt");
+
+        // 3 bytes (Padding to multiple of 4)
+        expected_bytes.extend_from_slice(&[0x00, 0x00, 0x00]);
+
+        assert_eq!(bytes, expected_bytes);
+    }
 }

@@ -185,4 +185,33 @@ mod tests {
 
         assert!(Par2MainData::from_bytes(truncated).is_err());
     }
+
+    #[test]
+    fn to_bytes_matches_specification() {
+        let main_data = Par2MainData {
+            slice_size: 258, // 0x0102 in hex
+            recovery_file_ids: vec![Par2FileId([0x11; 16])],
+            non_recovery_file_ids: vec![Par2FileId([0x22; 16])],
+        };
+
+        let bytes = main_data.to_bytes().unwrap();
+
+        let mut expected_bytes = Vec::new();
+
+        // 8 bytes: slice_size (LittleEndian 258)
+        expected_bytes.extend_from_slice(&[0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+
+        // 4 bytes: recovery file count (LittleEndian 1)
+        expected_bytes.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+
+        // 16 bytes: the single recovery_file_id
+        expected_bytes.extend_from_slice(&[0x11; 16]);
+
+        // 16 bytes: the single non_recovery_file_id
+        // (Notice there is no count for non-recovery files, the spec
+        // determines them purely by the remaining length of the packet)
+        expected_bytes.extend_from_slice(&[0x22; 16]);
+
+        assert_eq!(bytes, expected_bytes);
+    }
 }
