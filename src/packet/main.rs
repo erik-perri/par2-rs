@@ -13,6 +13,24 @@ pub struct Par2MainData {
 }
 
 impl Par2MainData {
+    pub fn recovery_set_id(&self) -> Par2RecoverySetId {
+        let mut hasher = Md5::new();
+
+        hasher.update(self.slice_size.to_le_bytes());
+        hasher.update((self.recovery_file_ids.len() as u32).to_le_bytes());
+
+        for recovery_file_id in &self.recovery_file_ids {
+            hasher.update(recovery_file_id.as_ref());
+        }
+
+        for non_recovery_file_id in &self.non_recovery_file_ids {
+            hasher.update(non_recovery_file_id.as_ref());
+        }
+
+        let computed_md5 = Par2Md5Hash(hasher.finalize().into());
+        Par2RecoverySetId::from(computed_md5)
+    }
+
     pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
@@ -73,8 +91,10 @@ impl Par2MainData {
         })
     }
 
-    pub fn to_bytes(&self) -> Result<(Vec<u8>, Par2RecoverySetId), Par2Error> {
-        let mut cursor = Cursor::new(Vec::new());
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+        let capacity =
+            8 + 4 + (self.recovery_file_ids.len() * 16) + (self.non_recovery_file_ids.len() * 16);
+        let mut cursor = Cursor::new(Vec::with_capacity(capacity));
 
         cursor.write_u64::<LittleEndian>(self.slice_size)?;
         cursor.write_u32::<LittleEndian>(self.recovery_file_ids.len() as u32)?;
@@ -87,92 +107,80 @@ impl Par2MainData {
             cursor.write_all(non_recovery_file_id.as_ref())?;
         }
 
-        let data = cursor.into_inner();
-
-        let body_md5 = Par2Md5Hash(Md5::digest(&data).into());
-        let computed_recovery_set_id = Par2RecoverySetId::from(body_md5);
-
-        Ok((data, computed_recovery_set_id))
+        Ok(cursor.into_inner())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use byteorder::WriteBytesExt;
-    use std::io::Write;
-
-    fn build_body_main_bytes(
-        slice_size: u64,
-        recovery_file_ids: &[Par2FileId],
-        non_recovery_file_ids: &[Par2FileId],
-        file_count: Option<u32>,
-    ) -> Vec<u8> {
-        let mut cursor = Cursor::new(Vec::new());
-
-        cursor.write_u64::<LittleEndian>(slice_size).unwrap();
-
-        let file_count = file_count.unwrap_or(recovery_file_ids.len() as u32);
-        cursor.write_u32::<LittleEndian>(file_count).unwrap();
-
-        for file_id in recovery_file_ids {
-            cursor.write_all(file_id.as_ref()).unwrap();
-        }
-        for file_id in non_recovery_file_ids {
-            cursor.write_all(file_id.as_ref()).unwrap();
-        }
-
-        cursor.into_inner()
-    }
 
     #[test]
     fn normal_body() {
-        let body_bytes = build_body_main_bytes(
-            1234,
-            &[Par2FileId([0xAA; 16]), Par2FileId([0xBB; 16])],
-            &[],
-            None,
-        );
+        let expected = Par2MainData {
+            slice_size: 1234,
+            recovery_file_ids: vec![Par2FileId([0xAA; 16]), Par2FileId([0xBB; 16])],
+            non_recovery_file_ids: vec![],
+        };
 
+        let body_bytes = expected.to_bytes().unwrap();
         let main_data = Par2MainData::from_bytes(&body_bytes).unwrap();
 
-        assert_eq!(main_data.slice_size, 1234);
-        assert_eq!(main_data.recovery_file_ids.len(), 2);
-        assert_eq!(main_data.recovery_file_ids[0], Par2FileId([0xAA; 16]));
-        assert_eq!(main_data.recovery_file_ids[1], Par2FileId([0xBB; 16]));
-
-        assert_eq!(main_data.non_recovery_file_ids.len(), 0);
+        assert_eq!(main_data.slice_size, expected.slice_size);
+        assert_eq!(main_data.recovery_file_ids, expected.recovery_file_ids);
+        assert_eq!(
+            main_data.non_recovery_file_ids,
+            expected.non_recovery_file_ids
+        );
     }
 
     #[test]
     fn non_recovery_files() {
-        let body_bytes = build_body_main_bytes(1234, &[], &[Par2FileId([0xCC; 16])], None);
+        let expected = Par2MainData {
+            slice_size: 1234,
+            recovery_file_ids: vec![],
+            non_recovery_file_ids: vec![Par2FileId([0xCC; 16])],
+        };
 
+        let body_bytes = expected.to_bytes().unwrap();
         let main_data = Par2MainData::from_bytes(&body_bytes).unwrap();
 
-        assert_eq!(main_data.slice_size, 1234);
-
-        assert_eq!(main_data.recovery_file_ids.len(), 0);
-
-        assert_eq!(main_data.non_recovery_file_ids.len(), 1);
-        assert_eq!(main_data.non_recovery_file_ids[0], Par2FileId([0xCC; 16]),)
+        assert_eq!(main_data.slice_size, expected.slice_size);
+        assert_eq!(main_data.recovery_file_ids, expected.recovery_file_ids);
+        assert_eq!(
+            main_data.non_recovery_file_ids,
+            expected.non_recovery_file_ids
+        );
     }
 
     #[test]
     fn invalid_file_count() {
-        let body_bytes = build_body_main_bytes(1234, &[], &[], Some(10));
+        let mut body_bytes = Par2MainData {
+            slice_size: 1234,
+            recovery_file_ids: vec![],
+            non_recovery_file_ids: vec![],
+        }
+        .to_bytes()
+        .unwrap();
+
+        // The file_count sits at offset 8 (after 8 bytes of slice_size).
+        // Overwrite it with a higher value (10) to exceed available bounds.
+        body_bytes[8..12].copy_from_slice(&10u32.to_le_bytes());
 
         assert!(Par2MainData::from_bytes(&body_bytes).is_err());
     }
 
     #[test]
     fn unexpected_size() {
-        let body_bytes = build_body_main_bytes(
-            1234,
-            &[Par2FileId([0xCC; 16])],
-            &[Par2FileId([0xBB; 16])],
-            None,
-        );
+        let body_bytes = Par2MainData {
+            slice_size: 1234,
+            recovery_file_ids: vec![Par2FileId([0xCC; 16])],
+            non_recovery_file_ids: vec![Par2FileId([0xBB; 16])],
+        }
+        .to_bytes()
+        .unwrap();
+
+        // Truncate the last 4 bytes to cause a length validation error
         let truncated = &body_bytes[0..body_bytes.len() - 4];
 
         assert!(Par2MainData::from_bytes(truncated).is_err());

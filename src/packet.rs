@@ -224,7 +224,14 @@ mod tests {
         #[test]
         fn file_desc_type_routing() {
             let packet_type = PAR2_PACKET_MAGIC_FILE_DESC;
-            let body_bytes: Vec<u8> = vec![0x00; 64];
+            let body_bytes = Par2FileDescriptionData {
+                file_md5: Par2Md5Hash([0; 16]),
+                file_first_16kb_md5: Par2Md5Hash([0; 16]),
+                file_length: 0,
+                file_name: "test".to_string(),
+            }
+            .to_bytes()
+            .unwrap();
 
             let parsed_body = parse_body(packet_type, &body_bytes).unwrap();
             let Par2PacketBody::FileDesc(_) = parsed_body else {

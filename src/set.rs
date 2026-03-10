@@ -126,9 +126,8 @@ impl Par2ParsedSet {
     }
 
     pub fn validate(self) -> Result<Par2Set, Par2Error> {
-        let (_, computed_id) = self.main.data.to_bytes()?;
         if self.main.computed_md5 != self.main.expected_md5
-            || self.main.recovery_set_id != computed_id
+            || self.main.recovery_set_id != self.main.data.recovery_set_id()
         {
             return Err(Par2Error::MainPacketIntegrityFailure);
         }
@@ -192,7 +191,7 @@ impl Par2ParsedSet {
         let file_descriptions = dedup_by_file_id(
             valid_file_descriptions,
             &mut warnings,
-            |fd| fd.file_id,
+            |fd| fd.file_id(),
             Par2Warning::UnexpectedFileDescription,
         );
 
@@ -318,7 +317,6 @@ mod tests {
             fn make_minimal_file_desc(recovery_set_id: Par2RecoverySetId) -> Par2Packet {
                 make_packet(
                     Par2PacketBody::FileDesc(Par2FileDescriptionData {
-                        file_id: Par2FileId([0x00; 16]),
                         file_md5: Par2Md5Hash([0xBB; 16]),
                         file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                         file_length: 0,
@@ -528,7 +526,8 @@ mod tests {
                     recovery_file_ids: vec![],
                     slice_size: 1024,
                 };
-                let (_, recovery_set_id) = main_data.to_bytes().unwrap();
+                let recovery_set_id = main_data.recovery_set_id();
+
                 (main_data, recovery_set_id)
             }
 
@@ -543,7 +542,6 @@ mod tests {
                     ),
                     make_packet(
                         Par2PacketBody::FileDesc(Par2FileDescriptionData {
-                            file_id: Par2FileId([0x00; 16]),
                             file_md5: Par2Md5Hash([0xBB; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xCC; 16]),
                             file_length: 0,
@@ -618,7 +616,6 @@ mod tests {
                             packet_type: *PAR2_PACKET_MAGIC_FILE_DESC,
                         },
                         body: Par2PacketBody::FileDesc(Par2FileDescriptionData {
-                            file_id: Par2FileId([0x00; 16]),
                             file_md5: Par2Md5Hash([0xEE; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                             file_length: 0,
@@ -657,7 +654,6 @@ mod tests {
                     ),
                     make_packet(
                         Par2PacketBody::FileDesc(Par2FileDescriptionData {
-                            file_id: Par2FileId([0x00; 16]),
                             file_md5: Par2Md5Hash([0xAA; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                             file_length: 0,
@@ -704,7 +700,6 @@ mod tests {
                     ),
                     make_packet(
                         Par2PacketBody::FileDesc(Par2FileDescriptionData {
-                            file_id: Par2FileId([0x00; 16]),
                             file_md5: Par2Md5Hash([0xFF; 16]),
                             file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                             file_length: 0,
@@ -757,7 +752,6 @@ mod tests {
 
     mod validate_and_filter {
         use super::*;
-        use crate::packet::Par2FileId;
 
         #[test]
         fn filters_unknown_recovery_set_ids() {
@@ -768,7 +762,6 @@ mod tests {
                     computed_md5: Par2Md5Hash([0xBB; 16]),
                     expected_md5: Par2Md5Hash([0xBB; 16]),
                     data: Par2FileDescriptionData {
-                        file_id: Par2FileId([0xDD; 16]),
                         file_md5: Par2Md5Hash([0xAA; 16]),
                         file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                         file_length: 0,
@@ -780,7 +773,6 @@ mod tests {
                     computed_md5: Par2Md5Hash([0xAA; 16]),
                     expected_md5: Par2Md5Hash([0xAA; 16]),
                     data: Par2FileDescriptionData {
-                        file_id: Par2FileId([0x00; 16]),
                         file_md5: Par2Md5Hash([0xAA; 16]),
                         file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                         file_length: 0,
@@ -815,7 +807,6 @@ mod tests {
                 computed_md5: Par2Md5Hash([0xBB; 16]),
                 expected_md5: Par2Md5Hash([0xAA; 16]),
                 data: Par2FileDescriptionData {
-                    file_id: Par2FileId([0x00; 16]),
                     file_md5: Par2Md5Hash([0xAA; 16]),
                     file_first_16kb_md5: Par2Md5Hash([0xBB; 16]),
                     file_length: 0,

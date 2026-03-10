@@ -1,8 +1,7 @@
 use crate::error::Par2Error;
 use crate::file;
-use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData, Par2SliceChecksumEntry};
+use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData};
 use crate::set::Par2Set;
-use md5::Digest;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -54,13 +53,13 @@ pub(crate) enum Par2VerificationSliceStatus {
 pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
     let mut results = Vec::new();
 
-    for file_description in set.file_descriptions.into_values() {
+    for (file_id, file_description) in set.file_descriptions.into_iter() {
         // TODO Join Path::new(file_name).file_name() to strip paths
         let file_path = base_path.join(file_description.file_name);
 
         if !file_path.is_file() {
             results.push(Par2FileVerificationResult::NotFound {
-                file_id: file_description.file_id,
+                file_id,
                 file_length: file_description.file_length,
                 file_path,
             });
@@ -73,18 +72,18 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
             Err(error) => {
                 results.push(Par2FileVerificationResult::Unreadable {
                     error,
-                    file_id: file_description.file_id,
+                    file_id,
                     file_path,
                 });
                 continue;
             }
         };
 
-        let file_checksums = match set.slice_checksums.get(&file_description.file_id) {
+        let file_checksums = match set.slice_checksums.get(&file_id) {
             Some(checksum) => checksum,
             None => {
                 results.push(Par2FileVerificationResult::FoundWithoutChecksums {
-                    file_id: file_description.file_id,
+                    file_id,
                     file_intact: file_description.file_md5 == computed_checksums.file_md5,
                     file_length: computed_checksums.file_length,
                     file_md5: computed_checksums.file_md5,
@@ -95,11 +94,7 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
             }
         };
 
-        println!(
-            "Verifying file: {} / {}",
-            file_description.file_id,
-            file_path.display()
-        );
+        println!("Verifying file: {} / {}", file_id, file_path.display());
 
         let mut slice_statuses = Vec::new();
         let expected_count = file_checksums.entries.len();
@@ -121,7 +116,7 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
         }
 
         results.push(Par2FileVerificationResult::Found {
-            file_id: file_description.file_id,
+            file_id,
             file_length: computed_checksums.file_length,
             file_md5: computed_checksums.file_md5,
             file_name: file_path.file_name().unwrap().to_string_lossy().to_string(),

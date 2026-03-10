@@ -1,6 +1,5 @@
 use crate::error::Par2Error;
 use std::path::{Path, PathBuf};
-use std::process;
 
 pub(crate) fn create(
     _block_size: u64,

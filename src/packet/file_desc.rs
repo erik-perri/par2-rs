@@ -1,12 +1,12 @@
 use crate::error::Par2Error;
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Cursor, Read};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use md5::{Digest, Md5};
+use std::io::{Cursor, Read, Write};
 
 use super::{Par2FileId, Par2Md5Hash, trim_trailing_null_bytes};
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Par2FileDescriptionData {
-    pub(crate) file_id: Par2FileId,
     pub(crate) file_md5: Par2Md5Hash,
     pub(crate) file_first_16kb_md5: Par2Md5Hash,
     pub(crate) file_length: u64,
@@ -14,11 +14,22 @@ pub struct Par2FileDescriptionData {
 }
 
 impl Par2FileDescriptionData {
+    pub fn file_id(&self) -> Par2FileId {
+        let mut hasher = Md5::new();
+
+        hasher.update(self.file_first_16kb_md5.as_ref());
+        hasher.update(self.file_length.to_le_bytes());
+        hasher.update(self.file_name.as_bytes());
+
+        let computed_file_id = Par2Md5Hash(hasher.finalize().into());
+        Par2FileId::from(computed_file_id)
+    }
+
     pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
-        let mut file_id: Par2FileId = Par2FileId([0; 16]);
-        cursor.read_exact(file_id.as_mut()).map_err(|e| {
+        let mut file_id = [0u8; 16];
+        cursor.read_exact(&mut file_id).map_err(|e| {
             Par2Error::ParseError(format!("truncated file description file id: {}", e))
         })?;
 
@@ -53,117 +64,137 @@ impl Par2FileDescriptionData {
             }
         };
 
-        Ok(Par2FileDescriptionData {
-            file_id,
+        let parsed_data = Par2FileDescriptionData {
             file_md5,
             file_first_16kb_md5,
             file_length,
             file_name,
-        })
+        };
+
+        if parsed_data.file_id().as_ref() != file_id {
+            return Err(Par2Error::ParseError(
+                "file id in header does not match computed file id".to_string(),
+            ));
+        }
+
+        Ok(parsed_data)
+    }
+
+    pub fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+        let file_id = self.file_id();
+
+        let mut cursor = Cursor::new(Vec::new());
+
+        cursor.write_all(file_id.as_ref())?;
+        cursor.write_all(self.file_md5.as_ref())?;
+        cursor.write_all(self.file_first_16kb_md5.as_ref())?;
+        cursor.write_u64::<LittleEndian>(self.file_length)?;
+
+        let name_bytes = self.file_name.as_bytes();
+        cursor.write_all(name_bytes)?;
+
+        let padding_length = (4 - (name_bytes.len() % 4)) % 4;
+        let padding = vec![0u8; padding_length];
+        cursor.write_all(&padding)?;
+
+        Ok(cursor.into_inner())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use byteorder::WriteBytesExt;
-    use std::io::Write;
-
-    fn build_file_description_bytes(
-        file_id: Par2FileId,
-        file_md5: Par2Md5Hash,
-        file_first_16kb_md5: Par2Md5Hash,
-        file_length: u64,
-        file_name: &[u8],
-    ) -> Vec<u8> {
-        let mut cursor = Cursor::new(Vec::new());
-
-        cursor.write_all(file_id.as_ref()).unwrap();
-        cursor.write_all(file_md5.as_ref()).unwrap();
-        cursor.write_all(file_first_16kb_md5.as_ref()).unwrap();
-        cursor.write_u64::<LittleEndian>(file_length).unwrap();
-
-        let padding_bytes = (4 - (file_name.len() % 4)) % 4;
-        let file_name_padding = vec![0; padding_bytes];
-
-        cursor.write_all(file_name).unwrap();
-        cursor.write_all(&file_name_padding).unwrap();
-
-        cursor.into_inner()
-    }
 
     #[test]
     fn normal_file_description() {
-        let file_description_bytes = build_file_description_bytes(
-            Par2FileId([0xAA; 16]),
-            Par2Md5Hash([0xBB; 16]),
-            Par2Md5Hash([0xCC; 16]),
-            1234,
-            b"a.txt", // 3 bytes of padding
-        );
+        let expected = Par2FileDescriptionData {
+            file_md5: Par2Md5Hash([0xBB; 16]),
+            file_first_16kb_md5: Par2Md5Hash([0xCC; 16]),
+            file_length: 1234,
+            file_name: "a.txt".to_string(),
+        };
 
-        let file_desc = Par2FileDescriptionData::from_bytes(&file_description_bytes).unwrap();
+        let body_bytes = expected.to_bytes().unwrap();
+        let file_desc = Par2FileDescriptionData::from_bytes(&body_bytes).unwrap();
 
-        assert_eq!(file_desc.file_id, Par2FileId([0xAA; 16]));
-        assert_eq!(file_desc.file_md5, Par2Md5Hash([0xBB; 16]));
-        assert_eq!(file_desc.file_first_16kb_md5, Par2Md5Hash([0xCC; 16]));
-        assert_eq!(file_desc.file_length, 1234);
-        assert_eq!(file_desc.file_name, "a.txt");
+        assert_eq!(file_desc, expected);
     }
 
     #[test]
     fn no_name_padding() {
-        let file_description_bytes = build_file_description_bytes(
-            Par2FileId([0xAA; 16]),
-            Par2Md5Hash([0xBB; 16]),
-            Par2Md5Hash([0xCC; 16]),
-            1234,
-            b"test.txt", // 0 bytes of padding
-        );
+        let expected = Par2FileDescriptionData {
+            file_md5: Par2Md5Hash([0xBB; 16]),
+            file_first_16kb_md5: Par2Md5Hash([0xCC; 16]),
+            file_length: 1234,
+            // "test.txt" is exactly 8 bytes, so it requires no padding
+            file_name: "test.txt".to_string(),
+        };
 
-        let file_desc = Par2FileDescriptionData::from_bytes(&file_description_bytes).unwrap();
+        let body_bytes = expected.to_bytes().unwrap();
+        let file_desc = Par2FileDescriptionData::from_bytes(&body_bytes).unwrap();
 
-        assert_eq!(file_desc.file_name, "test.txt");
+        assert_eq!(file_desc, expected);
     }
 
     #[test]
     fn minimal_name_padding() {
-        let file_description_bytes = build_file_description_bytes(
-            Par2FileId([0xAA; 16]),
-            Par2Md5Hash([0xBB; 16]),
-            Par2Md5Hash([0xCC; 16]),
-            1234,
-            b"testtxt", // 1 byte of padding
-        );
+        let expected = Par2FileDescriptionData {
+            file_md5: Par2Md5Hash([0xBB; 16]),
+            file_first_16kb_md5: Par2Md5Hash([0xCC; 16]),
+            file_length: 1234,
+            // "testtxt" is 7 bytes, so it requires 1 byte of padding
+            file_name: "testtxt".to_string(),
+        };
 
-        let file_desc = Par2FileDescriptionData::from_bytes(&file_description_bytes).unwrap();
+        let body_bytes = expected.to_bytes().unwrap();
+        let file_desc = Par2FileDescriptionData::from_bytes(&body_bytes).unwrap();
 
-        assert_eq!(file_desc.file_name, "testtxt");
+        assert_eq!(file_desc, expected);
     }
 
     #[test]
     fn too_short() {
-        let file_description_bytes = [0xAA; 32];
+        // 32 bytes is less than the 56 required for the headers before the name
+        let body_bytes = [0xAA; 32];
+        let parsed_body = Par2FileDescriptionData::from_bytes(&body_bytes);
 
-        let parsed_body = Par2FileDescriptionData::from_bytes(&file_description_bytes);
-
-        assert!(parsed_body.is_err());
         assert!(matches!(parsed_body, Err(Par2Error::ParseError(_))));
     }
 
     #[test]
     fn invalid_name() {
-        let file_description_bytes = build_file_description_bytes(
-            Par2FileId([0xAA; 16]),
-            Par2Md5Hash([0xBB; 16]),
-            Par2Md5Hash([0xCC; 16]),
-            1234,
-            &[0xAA; 32],
-        );
+        let mut body_bytes = Par2FileDescriptionData {
+            file_md5: Par2Md5Hash([0xBB; 16]),
+            file_first_16kb_md5: Par2Md5Hash([0xCC; 16]),
+            file_length: 1234,
+            file_name: "a.txt".to_string(),
+        }
+        .to_bytes()
+        .unwrap();
 
-        let parsed_body = Par2FileDescriptionData::from_bytes(&file_description_bytes);
+        // The file name starts at offset 56 (16 id + 16 md5 + 16 md5_16k + 8 length).
+        // Overwrite the 5 bytes of "a.txt" with invalid UTF-8.
+        body_bytes[56..61].copy_from_slice(&[0xFF; 5]);
 
-        assert!(parsed_body.is_err());
+        let parsed_body = Par2FileDescriptionData::from_bytes(&body_bytes);
+        assert!(matches!(parsed_body, Err(Par2Error::ParseError(_))));
+    }
+
+    #[test]
+    fn mismatched_file_id() {
+        let mut body_bytes = Par2FileDescriptionData {
+            file_md5: Par2Md5Hash([0xCC; 16]),
+            file_first_16kb_md5: Par2Md5Hash([0xCC; 16]),
+            file_length: 1234,
+            file_name: "a.txt".to_string(),
+        }
+        .to_bytes()
+        .unwrap();
+
+        // Overwrite the prepended file_id (the first 16 bytes) with something incorrect
+        body_bytes[0..16].copy_from_slice(&[0xFF; 16]);
+
+        let parsed_body = Par2FileDescriptionData::from_bytes(&body_bytes);
         assert!(matches!(parsed_body, Err(Par2Error::ParseError(_))));
     }
 }
