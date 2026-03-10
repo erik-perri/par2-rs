@@ -126,8 +126,9 @@ impl Par2ParsedSet {
     }
 
     pub fn validate(self) -> Result<Par2Set, Par2Error> {
+        let (_, computed_id) = self.main.data.to_bytes()?;
         if self.main.computed_md5 != self.main.expected_md5
-            || self.main.recovery_set_id != self.main.data.computed_recovery_set_id
+            || self.main.recovery_set_id != computed_id
         {
             return Err(Par2Error::MainPacketIntegrityFailure);
         }
@@ -304,7 +305,6 @@ mod tests {
             fn make_minimal_main(recovery_set_id: Par2RecoverySetId) -> Par2Packet {
                 make_packet(
                     Par2PacketBody::Main(Par2MainData {
-                        computed_recovery_set_id: recovery_set_id,
                         non_recovery_file_ids: vec![],
                         recovery_file_ids: vec![],
                         slice_size: 1024,
@@ -522,16 +522,21 @@ mod tests {
                 Par2PacketHeader, Par2SliceChecksumEntry,
             };
 
+            fn make_main_data() -> (Par2MainData, Par2RecoverySetId) {
+                let main_data = Par2MainData {
+                    non_recovery_file_ids: vec![],
+                    recovery_file_ids: vec![],
+                    slice_size: 1024,
+                };
+                let (_, recovery_set_id) = main_data.to_bytes().unwrap();
+                (main_data, recovery_set_id)
+            }
+
             fn valid_parsed_set() -> Par2ParsedSet {
-                let recovery_set_id = Par2RecoverySetId([0x01; 16]);
+                let (main_data, recovery_set_id) = make_main_data();
                 let packets = vec![
                     make_packet(
-                        Par2PacketBody::Main(Par2MainData {
-                            computed_recovery_set_id: recovery_set_id,
-                            non_recovery_file_ids: vec![],
-                            recovery_file_ids: vec![],
-                            slice_size: 1024,
-                        }),
+                        Par2PacketBody::Main(main_data),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,
                         Par2Md5Hash([0x10; 16]),
@@ -595,15 +600,10 @@ mod tests {
 
             #[test]
             fn all_file_descriptions_corrupt() {
-                let recovery_set_id = Par2RecoverySetId([0x01; 16]);
+                let (main_data, recovery_set_id) = make_main_data();
                 let packets = vec![
                     make_packet(
-                        Par2PacketBody::Main(Par2MainData {
-                            computed_recovery_set_id: recovery_set_id,
-                            non_recovery_file_ids: vec![],
-                            recovery_file_ids: vec![],
-                            slice_size: 1024,
-                        }),
+                        Par2PacketBody::Main(main_data),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,
                         Par2Md5Hash([0x10; 16]),
@@ -647,15 +647,10 @@ mod tests {
 
             #[test]
             fn all_slice_checksums_corrupt() {
-                let recovery_set_id = Par2RecoverySetId([0x01; 16]);
+                let (main_data, recovery_set_id) = make_main_data();
                 let packets = vec![
                     make_packet(
-                        Par2PacketBody::Main(Par2MainData {
-                            computed_recovery_set_id: recovery_set_id,
-                            non_recovery_file_ids: vec![],
-                            recovery_file_ids: vec![],
-                            slice_size: 1024,
-                        }),
+                        Par2PacketBody::Main(main_data),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,
                         Par2Md5Hash([0x10; 16]),
@@ -699,15 +694,10 @@ mod tests {
 
             #[test]
             fn all_recovery_slices_corrupt_produces_warning() {
-                let recovery_set_id = Par2RecoverySetId([0x01; 16]);
+                let (main_data, recovery_set_id) = make_main_data();
                 let packets = vec![
                     make_packet(
-                        Par2PacketBody::Main(Par2MainData {
-                            computed_recovery_set_id: recovery_set_id,
-                            non_recovery_file_ids: vec![],
-                            recovery_file_ids: vec![],
-                            slice_size: 1024,
-                        }),
+                        Par2PacketBody::Main(main_data),
                         PAR2_PACKET_MAGIC_MAIN,
                         recovery_set_id,
                         Par2Md5Hash([0x10; 16]),

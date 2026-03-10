@@ -1,13 +1,12 @@
 use crate::error::Par2Error;
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use md5::{Digest, Md5};
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Write};
 
 use super::{Par2FileId, Par2Md5Hash, Par2RecoverySetId};
 
 #[derive(Debug)]
 pub struct Par2MainData {
-    pub(crate) computed_recovery_set_id: Par2RecoverySetId,
     pub(crate) non_recovery_file_ids: Vec<Par2FileId>,
     pub(crate) recovery_file_ids: Vec<Par2FileId>,
     pub(crate) slice_size: u64,
@@ -67,15 +66,33 @@ impl Par2MainData {
             non_recovery_file_ids.push(file_id);
         }
 
-        let body_md5 = Par2Md5Hash(Md5::digest(data).into());
-        let computed_recovery_set_id = Par2RecoverySetId::from(body_md5);
-
         Ok(Par2MainData {
-            computed_recovery_set_id,
             non_recovery_file_ids,
             recovery_file_ids,
             slice_size,
         })
+    }
+
+    pub fn to_bytes(&self) -> Result<(Vec<u8>, Par2RecoverySetId), Par2Error> {
+        let mut cursor = Cursor::new(Vec::new());
+
+        cursor.write_u64::<LittleEndian>(self.slice_size)?;
+        cursor.write_u32::<LittleEndian>(self.recovery_file_ids.len() as u32)?;
+
+        for recovery_file_id in &self.recovery_file_ids {
+            cursor.write_all(recovery_file_id.as_ref())?;
+        }
+
+        for non_recovery_file_id in &self.non_recovery_file_ids {
+            cursor.write_all(non_recovery_file_id.as_ref())?;
+        }
+
+        let data = cursor.into_inner();
+
+        let body_md5 = Par2Md5Hash(Md5::digest(&data).into());
+        let computed_recovery_set_id = Par2RecoverySetId::from(body_md5);
+
+        Ok((data, computed_recovery_set_id))
     }
 }
 
