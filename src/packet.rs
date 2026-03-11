@@ -15,7 +15,7 @@ pub use slice_checksum::{Par2SliceChecksumData, Par2SliceChecksumEntry};
 use crate::error::Par2Error;
 use std::fmt::Display;
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Par2FileId(pub(crate) [u8; 16]);
 
 impl std::fmt::Debug for Par2FileId {
@@ -48,7 +48,7 @@ impl Display for Par2FileId {
     }
 }
 
-#[derive(Eq, PartialEq)]
+#[derive(Clone, Copy, Eq, PartialEq)]
 pub struct Par2Md5Hash(pub(crate) [u8; 16]);
 
 impl std::fmt::Debug for Par2Md5Hash {
@@ -113,6 +113,30 @@ pub enum Par2PacketBody {
     Unknown(Par2PacketType),
 }
 
+impl Par2PacketBody {
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+        match self {
+            Par2PacketBody::Main(data) => data.to_bytes(),
+            Par2PacketBody::FileDesc(data) => data.to_bytes(),
+            Par2PacketBody::SliceChecksum(data) => data.to_bytes(),
+            Par2PacketBody::RecoverySlice(data) => data.to_bytes(),
+            Par2PacketBody::Creator(data) => data.to_bytes(),
+            Par2PacketBody::Unknown(..) => Err(Par2Error::InvalidPacket),
+        }
+    }
+
+    pub(crate) fn packet_type(&self) -> &Par2PacketType {
+        match self {
+            Par2PacketBody::Main(..) => PAR2_PACKET_MAGIC_MAIN,
+            Par2PacketBody::FileDesc(..) => PAR2_PACKET_MAGIC_FILE_DESC,
+            Par2PacketBody::SliceChecksum(..) => PAR2_PACKET_MAGIC_SLICE_CHECKSUM,
+            Par2PacketBody::RecoverySlice(..) => PAR2_PACKET_MAGIC_RECOVERY_SLICE,
+            Par2PacketBody::Creator(..) => PAR2_PACKET_MAGIC_CREATOR,
+            Par2PacketBody::Unknown(packet_type) => packet_type,
+        }
+    }
+}
+
 pub const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
 pub const PAR2_PACKET_MAGIC_MAIN: &Par2PacketType = b"PAR 2.0\0Main\0\0\0\0";
 pub const PAR2_PACKET_MAGIC_FILE_DESC: &Par2PacketType = b"PAR 2.0\0FileDesc";
@@ -143,8 +167,10 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
         let packet_length = header.packet_length as usize;
 
         println!(
-            "Parsed header at [{}], length {}",
-            header_offset, packet_length
+            "Parsed header {} at [{}], length {}",
+            display_packet_type(&header.packet_type),
+            header_offset,
+            packet_length
         );
 
         let body_offset = header_offset + PAR2_HEADER_SIZE;
@@ -167,6 +193,10 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
     }
 
     Ok(packets)
+}
+
+fn display_packet_type(packet_type: &Par2PacketType) -> String {
+    String::from_utf8_lossy(packet_type.as_ref()).replace('\0', "_")
 }
 
 fn parse_body(packet_type: &Par2PacketType, data: &[u8]) -> Result<Par2PacketBody, Par2Error> {

@@ -1,6 +1,6 @@
 use crate::error::Par2Error;
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Cursor, Read};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Cursor, Read, Write};
 
 #[derive(Debug)]
 pub struct Par2RecoverySliceData {
@@ -27,6 +27,15 @@ impl Par2RecoverySliceData {
             exponent,
             recovery_data,
         })
+    }
+
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+        let mut cursor = Cursor::new(Vec::new());
+
+        cursor.write_u32::<LittleEndian>(self.exponent)?;
+        cursor.write_all(&self.recovery_data)?;
+
+        Ok(cursor.into_inner())
     }
 }
 

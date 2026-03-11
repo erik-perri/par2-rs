@@ -1,4 +1,5 @@
 use crate::error::Par2Error;
+use std::io::{Cursor, Write};
 
 use super::trim_trailing_null_bytes;
 
@@ -20,6 +21,19 @@ impl Par2CreatorData {
         };
 
         Ok(Par2CreatorData { name })
+    }
+
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+        let mut cursor = Cursor::new(Vec::new());
+
+        let name_bytes = self.name.as_bytes();
+        cursor.write_all(name_bytes)?;
+
+        let padding_length = (4 - (name_bytes.len() % 4)) % 4;
+        let padding = vec![0u8; padding_length];
+        cursor.write_all(&padding)?;
+
+        Ok(cursor.into_inner())
     }
 }
 

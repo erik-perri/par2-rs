@@ -1,6 +1,6 @@
 use crate::error::Par2Error;
-use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Cursor, Read};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::io::{Cursor, Read, Write};
 
 use super::{Par2FileId, Par2Md5Hash};
 
@@ -49,6 +49,19 @@ impl Par2SliceChecksumData {
         }
 
         Ok(Par2SliceChecksumData { file_id, entries })
+    }
+
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+        let mut cursor = Cursor::new(Vec::new());
+
+        cursor.write_all(self.file_id.as_ref())?;
+
+        for entry in &self.entries {
+            cursor.write_all(entry.md5.as_ref())?;
+            cursor.write_u32::<LittleEndian>(entry.crc32)?;
+        }
+
+        Ok(cursor.into_inner())
     }
 }
 

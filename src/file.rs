@@ -7,17 +7,19 @@ use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
-pub(crate) struct Par2FileChecksums {
+pub(crate) struct Par2ComputedFileData {
     pub(crate) computed_slice_checksums: Vec<Par2SliceChecksumEntry>,
     pub(crate) file_id: Par2FileId,
     pub(crate) file_length: u64,
     pub(crate) file_md5: Par2Md5Hash,
+    pub(crate) file_name: String,
+    pub(crate) first_16kb_md5: Par2Md5Hash,
 }
 
-pub(crate) fn compute_file_checksums(
+pub(crate) fn compute_file_data(
     file_path: &Path,
     slice_size: u64,
-) -> Result<Par2FileChecksums, Par2Error> {
+) -> Result<Par2ComputedFileData, Par2Error> {
     let file_metadata = file_path.metadata()?;
 
     let file_name = file_path
@@ -82,11 +84,13 @@ pub(crate) fn compute_file_checksums(
     let file_md5 = Par2Md5Hash(file_md5_hasher.finalize().into());
     let file_id = compute_file_id(file_name, file_length, &first_16kb_md5);
 
-    Ok(Par2FileChecksums {
+    Ok(Par2ComputedFileData {
         computed_slice_checksums,
         file_id,
         file_length,
         file_md5,
+        file_name: file_name.to_string(),
+        first_16kb_md5,
     })
 }
 

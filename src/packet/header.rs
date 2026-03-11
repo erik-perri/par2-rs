@@ -1,12 +1,11 @@
-use crate::error::Par2Error;
-use byteorder::{LittleEndian, ReadBytesExt};
-use md5::{Digest, Md5};
-use std::io::{Cursor, Read};
-
 use super::{
     PAR2_HASH_START_OFFSET, PAR2_HEADER_SIZE, PAR2_PACKET_MAGIC_HEADER, Par2Md5Hash,
     Par2PacketType, Par2RecoverySetId,
 };
+use crate::error::Par2Error;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use md5::{Digest, Md5};
+use std::io::{Cursor, Read, Write};
 
 pub struct Par2PacketHeader {
     pub(crate) packet_length: u64,
@@ -17,6 +16,30 @@ pub struct Par2PacketHeader {
 }
 
 impl Par2PacketHeader {
+    pub fn from_body(
+        recovery_set_id: &Par2RecoverySetId,
+        packet_type: &Par2PacketType,
+        body_data: &[u8],
+    ) -> Self {
+        let packet_length = (PAR2_HEADER_SIZE + body_data.len()) as u64;
+
+        let mut hasher = Md5::new();
+
+        hasher.update(recovery_set_id.as_ref());
+        hasher.update(packet_type.as_ref());
+        hasher.update(body_data);
+
+        let computed_md5 = Par2Md5Hash(hasher.finalize().into());
+
+        Par2PacketHeader {
+            computed_md5,
+            expected_md5: computed_md5,
+            packet_length,
+            packet_type: *packet_type,
+            recovery_set_id: *recovery_set_id,
+        }
+    }
+
     pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
@@ -79,6 +102,18 @@ impl Par2PacketHeader {
             recovery_set_id,
             packet_type,
         })
+    }
+
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+        let mut cursor = Cursor::new(Vec::new());
+
+        cursor.write_all(PAR2_PACKET_MAGIC_HEADER)?;
+        cursor.write_u64::<LittleEndian>(self.packet_length)?;
+        cursor.write_all(self.expected_md5.as_ref())?;
+        cursor.write_all(self.recovery_set_id.as_ref())?;
+        cursor.write_all(&self.packet_type)?;
+
+        Ok(cursor.into_inner())
     }
 }
 

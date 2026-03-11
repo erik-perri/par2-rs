@@ -25,6 +25,8 @@ enum Commands {
         block_size: u64,
         #[arg(short = 'c', long, default_value = "2")]
         recovery_block_count: u16,
+        #[arg(long, default_value = "testing")]
+        creator: String,
         #[arg(required = true)]
         output: PathBuf,
         #[arg(required = true)]
@@ -49,7 +51,8 @@ fn main() {
             recovery_block_count,
             output,
             files,
-        } => cli::create(block_size, recovery_block_count, &output, &files),
+            creator,
+        } => cli::create(block_size, recovery_block_count, &output, &files, &creator),
         Commands::Verify { file } => cli::verify(&file),
         Commands::Repair { file } => cli::repair(&file),
     };

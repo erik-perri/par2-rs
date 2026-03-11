@@ -66,8 +66,7 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
             continue;
         }
 
-        let computed_checksums = match file::compute_file_checksums(&file_path, set.main.slice_size)
-        {
+        let computed_checksums = match file::compute_file_data(&file_path, set.main.slice_size) {
             Ok(id) => id,
             Err(error) => {
                 results.push(Par2FileVerificationResult::Unreadable {

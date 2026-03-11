@@ -4,8 +4,10 @@ use crate::packet::{Par2FileId, Par2Md5Hash, Par2PacketType, Par2RecoverySetId};
 pub enum Par2Error {
     AllFileDescriptionsCorrupt,
     AllSliceChecksumsCorrupt,
+    DuplicateInputFile,
     FilePathError(String),
     InvalidMainPacket(String),
+    InvalidPacket,
     Io(std::io::Error),
     MainPacketConflict,
     MainPacketIntegrityFailure,
@@ -32,8 +34,10 @@ impl std::fmt::Display for Par2Error {
         match self {
             Par2Error::AllFileDescriptionsCorrupt => write!(f, "all file descriptions are corrupt"),
             Par2Error::AllSliceChecksumsCorrupt => write!(f, "all slice checksums are corrupt"),
+            Par2Error::DuplicateInputFile => write!(f, "duplicate input file"),
             Par2Error::FilePathError(message) => write!(f, "{}", message),
             Par2Error::InvalidMainPacket(message) => write!(f, "invalid main packet: {}", message),
+            Par2Error::InvalidPacket => write!(f, "invalid packet type"),
             Par2Error::Io(err) => write!(f, "{}", err),
             Par2Error::MainPacketConflict => write!(f, "conflicting main packet"),
             Par2Error::MainPacketIntegrityFailure => write!(f, "main packet integrity failure"),
