@@ -5,50 +5,25 @@ use std::path::Path;
 use std::{fs, process};
 
 pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
-    let primary_file = match fs::canonicalize(path) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("\"{}\" is not a valid file: {}", path.display(), e);
-            process::exit(1);
-        }
-    };
+    let primary_file = fs::canonicalize(path)?;
 
-    let file_paths = file::locate_files(&primary_file).unwrap_or_else(|e| {
-        println!("Failed to locate files: {}", e);
-        process::exit(1);
-    });
+    let file_paths = file::locate_files(&primary_file)?;
 
     let mut packets = Vec::new();
 
     for file_path in file_paths {
         println!("Parsing file: {}", file_path.display());
 
-        let parsed_packets = packet::parse_file(&file_path).unwrap_or_else(|e| {
-            println!(
-                "Failed to parse packets from {}: {}",
-                file_path.display(),
-                e
-            );
-
-            process::exit(1);
-        });
+        let parsed_packets = packet::parse_file(&file_path)?;
 
         packets.extend(parsed_packets);
     }
 
-    let potential_set = Par2ParsedSet::from_packets(packets).unwrap_or_else(|e| {
-        println!("Failed to combine set: {}", e);
-        process::exit(1);
-    });
+    let potential_set = Par2ParsedSet::from_packets(packets)?;
 
-    let validated_set = potential_set.validate().unwrap_or_else(|e| {
-        println!("Failed to validate set: {}", e);
-        process::exit(1);
-    });
+    let validated_set = potential_set.validate()?;
 
-    let base_path = primary_file
-        .parent()
-        .expect("canonicalized path should always have a parent");
+    let base_path = primary_file.parent().unwrap_or(Path::new("."));
 
     let verified_set = verify::verify_set(validated_set, base_path);
 

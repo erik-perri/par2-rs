@@ -122,9 +122,7 @@ pub fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
 
     let mut files = vec![base.to_path_buf()];
 
-    let parent_path = base
-        .parent()
-        .ok_or(Par2Error::FilePathError("missing parent directory".into()))?;
+    let parent_path = base.parent().unwrap_or(Path::new("."));
 
     let base_file_stem = base
         .file_stem()
