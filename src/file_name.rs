@@ -4,12 +4,12 @@ use std::path::Path;
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct Par2FileSpec {
-    file_name: String,
-    starting_exponent: u16,
-    block_count: u16,
+    pub(crate) file_name: String,
+    pub(crate) starting_exponent: u16,
+    pub(crate) block_count: u16,
 }
 
-pub(crate) fn build_recovery_files(
+pub(crate) fn plan_recovery_files(
     base_file_name: &Path,
     recovery_block_count: u16,
 ) -> Result<Vec<Par2FileSpec>, Par2Error> {
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn produces_expected_output() {
         let path = Path::new("test.dat");
-        let files = build_recovery_files(path, 15).expect("failed to build recovery files");
+        let files = plan_recovery_files(path, 15).expect("failed to build recovery files");
 
         assert_eq!(
             files,
@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn has_consistent_padding() {
         let path = Path::new("test.dat");
-        let files = build_recovery_files(path, 127).expect("failed to build recovery files");
+        let files = plan_recovery_files(path, 127).expect("failed to build recovery files");
 
         assert_eq!(files.len(), 8);
         assert_eq!(files[1].file_name, "test.vol000+01.par2");

@@ -13,6 +13,7 @@ pub(crate) struct Par2ComputedFileData {
     pub(crate) file_length: u64,
     pub(crate) file_md5: Par2Md5Hash,
     pub(crate) file_name: String,
+    pub(crate) file_path: PathBuf,
     pub(crate) first_16kb_md5: Par2Md5Hash,
 }
 
@@ -90,6 +91,7 @@ pub(crate) fn compute_file_data(
         file_length,
         file_md5,
         file_name: file_name.to_string(),
+        file_path: file_path.to_path_buf(),
         first_16kb_md5,
     })
 }
