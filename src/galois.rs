@@ -16,9 +16,9 @@ impl GaloisFieldCalculator {
 
         let mut value: u32 = 1;
 
-        for i in 0..65535 {
-            exp_table[i] = value as u16;
-            log_table[value as usize] = i as u16;
+        for exponent in 0..65535 {
+            exp_table[exponent] = value as u16;
+            log_table[value as usize] = exponent as u16;
 
             value <<= 1;
 
