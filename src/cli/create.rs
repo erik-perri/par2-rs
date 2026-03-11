@@ -6,7 +6,7 @@ use crate::packet::{
     Par2CreatorData, Par2FileDescriptionData, Par2MainData, Par2PacketBody, Par2PacketHeader,
     Par2RecoverySetId, Par2RecoverySliceData, Par2SliceChecksumData,
 };
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
@@ -96,11 +96,7 @@ pub(crate) fn create(
             let mut recovery_bytes = Vec::new();
 
             for item in recovery_buffer {
-                let high_byte: u8 = (item >> 8) as u8;
-                let low_byte: u8 = (item & 0xff) as u8;
-
-                recovery_bytes.push(low_byte);
-                recovery_bytes.push(high_byte);
+                recovery_bytes.write_u16::<LittleEndian>(item)?;
             }
 
             recovery_slices.push(Par2RecoverySliceData {
