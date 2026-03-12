@@ -9,7 +9,7 @@ mod verify;
 
 use clap::{Parser, Subcommand};
 use colored::Colorize;
-use log::{LevelFilter, error};
+use log::error;
 use std::path::PathBuf;
 use std::process;
 

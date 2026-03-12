@@ -8,7 +8,7 @@ use crate::packet::{
 };
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use colored::Colorize;
-use log::{debug, info};
+use log::info;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};

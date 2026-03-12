@@ -3,7 +3,7 @@ use crate::set::Par2ParsedSet;
 use crate::{file, packet, verify};
 use log::{debug, trace};
 use std::path::Path;
-use std::{fs, process};
+use std::fs;
 
 pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     let primary_file = fs::canonicalize(path)?;
