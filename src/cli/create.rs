@@ -22,7 +22,7 @@ pub(crate) fn create(
     creator: &str,
 ) -> Result<(), Par2Error> {
     let parent = base_output_file.parent().unwrap_or(Path::new("."));
-    let file_plan = plan_recovery_files(&base_output_file, recovery_block_count)?;
+    let file_plan = plan_recovery_files(base_output_file, recovery_block_count)?;
 
     for spec in &file_plan {
         let output_file_path = parent.join(&spec.file_name);
@@ -34,7 +34,7 @@ pub(crate) fn create(
         }
     }
 
-    let file_data = compute_files(slice_size, &input_files)?;
+    let file_data = compute_files(slice_size, input_files)?;
 
     let sorted_file_paths: Vec<PathBuf> = file_data.iter().map(|f| f.file_path.clone()).collect();
 

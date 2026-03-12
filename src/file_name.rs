@@ -37,7 +37,7 @@ pub(crate) fn plan_recovery_files(
     let power_width = calculate_par2_padding_width(recovery_block_count);
 
     while remaining > 0 {
-        if remaining % 2 != 0 {
+        if !remaining.is_multiple_of(2) {
             files.push(Par2FileSpec {
                 file_name: format!(
                     "{}.vol{:0>ew$}+{:0>pw$}.par2",
@@ -51,7 +51,7 @@ pub(crate) fn plan_recovery_files(
                 starting_exponent: current_exponent,
             });
 
-            current_exponent = current_exponent + power;
+            current_exponent += power;
         }
 
         remaining = remaining.div(2);
