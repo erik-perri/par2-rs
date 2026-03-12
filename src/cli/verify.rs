@@ -152,46 +152,50 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
         }
     }
 
+    info!("");
+
     if verified_set.is_all_intact() {
+        info!("{}", "Repair not required.".green());
         info!("{}", "Done".green().bold());
-        Ok(())
-    } else {
-        info!("Repair is required.");
-
-        let damaged = verified_set.damaged_file_count();
-        if damaged > 0 {
-            info!("{} file(s) exist but are damaged.", damaged);
-        }
-
-        let missing = verified_set.missing_file_count();
-        if missing > 0 {
-            info!("{} file(s) are missing.", missing);
-        }
-
-        let available = verified_set.available_data_blocks();
-        info!(
-            "You have {} out of {} data blocks available.",
-            available, total_data_blocks
-        );
-
-        let recovery = verified_set.recovery_blocks_available();
-        info!("You have {} recovery blocks available.", recovery);
-
-        if verified_set.is_repair_possible() {
-            let extra = recovery - verified_set.missing_blocks();
-            if extra > 0 {
-                info!("Repair is possible, {} extra recovery blocks.", extra);
-            } else {
-                info!("Repair is possible with no blocks to spare.");
-            }
-        } else {
-            info!(
-                "You need {} more recovery blocks for repair.",
-                verified_set.missing_blocks()
-            );
-        }
-
-        info!("{}", "Done".red().bold());
-        Err(Par2Error::RepairRequired)
+        return Ok(());
     }
+
+    info!("Repair is required.");
+
+    let damaged = verified_set.damaged_file_count();
+    if damaged > 0 {
+        info!("{} file(s) exist but are damaged.", damaged);
+    }
+
+    let missing = verified_set.missing_file_count();
+    if missing > 0 {
+        info!("{} file(s) are missing.", missing);
+    }
+
+    let available = verified_set.available_data_blocks();
+    info!(
+        "You have {} out of {} data blocks available.",
+        available, total_data_blocks
+    );
+
+    let recovery = verified_set.recovery_blocks_available();
+    info!("You have {} recovery blocks available.", recovery);
+
+    if verified_set.is_repair_possible() {
+        let extra = recovery - verified_set.missing_blocks();
+        if extra > 0 {
+            info!("Repair is possible, {} extra recovery blocks.", extra);
+        } else {
+            info!("Repair is possible with no blocks to spare.");
+        }
+    } else {
+        info!(
+            "You need {} more recovery blocks for repair.",
+            verified_set.missing_blocks() - recovery,
+        );
+    }
+
+    info!("{}", "Done".red().bold());
+
+    Err(Par2Error::RepairRequired)
 }
