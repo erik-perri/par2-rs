@@ -8,7 +8,8 @@ mod set;
 mod verify;
 
 use clap::{Parser, Subcommand};
-use log::error;
+use colored::Colorize;
+use log::{LevelFilter, error};
 use std::path::PathBuf;
 use std::process;
 
@@ -60,6 +61,7 @@ fn main() {
         .filter_level(level)
         .format_timestamp(None)
         .format_target(false)
+        .format_level(format_level(cli.verbose))
         .init();
 
     let result = match cli.command {
@@ -75,9 +77,13 @@ fn main() {
     };
 
     if let Err(e) = result {
-        error!("Error: {}", e);
+        error!("{}: {}", "Error".bold().red(), e);
         process::exit(1);
     }
 
     process::exit(0);
+}
+
+fn format_level(verbose: u8) -> bool {
+    verbose > 0
 }

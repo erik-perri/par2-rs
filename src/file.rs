@@ -1,6 +1,8 @@
 use crate::error::Par2Error;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2SliceChecksumEntry};
 use byteorder::{LittleEndian, WriteBytesExt};
+use colored::Colorize;
+use log::info;
 use md5::{Digest, Md5};
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
@@ -31,6 +33,7 @@ pub(crate) fn compute_file_data(
         })?;
 
     let file_length = file_metadata.len();
+    info!("Opening: {}", file_name.bold());
     let file = File::open(file_path)?;
 
     let first_16kb_size = (16 * 1024).min(file_length);

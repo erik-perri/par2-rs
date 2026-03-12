@@ -7,7 +7,8 @@ use crate::packet::{
     Par2RecoverySetId, Par2RecoverySliceData, Par2SliceChecksumData,
 };
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use log::debug;
+use colored::Colorize;
+use log::{debug, info};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
@@ -27,7 +28,7 @@ pub(crate) fn create(
         let output_file_path = parent.join(&spec.file_name);
         if output_file_path.exists() {
             return Err(Par2Error::FilePathError(format!(
-                "file at path {} already exists",
+                "file at path \"{}\" already exists",
                 output_file_path.display(),
             )));
         }
@@ -42,13 +43,24 @@ pub(crate) fn create(
         .map(|d| d.computed_slice_checksums.len())
         .sum();
 
-    debug!("Total input slices: {}", total_input_slices);
+    let source_file_count = file_data.len();
+    let recovery_file_count = file_plan.iter().filter(|s| s.block_count > 0).count();
+
+    info!("Block size: {}", slice_size);
+    info!("Source file count: {}", source_file_count);
+    info!("Source block count: {}", total_input_slices);
+    info!("Recovery block count: {}", recovery_block_count);
+    info!("Recovery file count: {}", recovery_file_count);
 
     let calculator = GaloisFieldCalculator::new();
     let common = build_common(slice_size, creator, file_data)?;
 
+    if recovery_block_count > 0 {
+        info!("Computing recovery data...");
+    }
+
     for spec in &file_plan {
-        debug!("Writing {}", spec.file_name);
+        info!("Writing: {}", spec.file_name.bold());
 
         let output_file_path = parent.join(&spec.file_name);
         let mut output_file = File::create(output_file_path)?;
@@ -123,6 +135,8 @@ pub(crate) fn create(
 
         output_file.write_all(&common.end_bytes)?;
     }
+
+    info!("{}", "Done".green().bold());
 
     Ok(())
 }
