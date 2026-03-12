@@ -46,7 +46,6 @@ pub(crate) fn create(
     let source_file_count = file_data.len();
     let recovery_file_count = file_plan.iter().filter(|s| s.block_count > 0).count();
 
-    info!("");
     info!("Source file count: {}", source_file_count);
     info!("Recovery file count: {}", recovery_file_count);
     debug!("Block size: {} bytes", slice_size);
@@ -57,9 +56,12 @@ pub(crate) fn create(
     let common = build_common(slice_size, creator, file_data)?;
 
     info!("");
+    info!("Writing files:");
     for spec in &file_plan {
-        info!("Writing: {}", spec.file_name.bold());
+        info!("- {}", spec.file_name.bold());
+    }
 
+    for spec in &file_plan {
         let output_file_path = parent.join(&spec.file_name);
         let mut output_file = File::create(output_file_path)?;
 
@@ -75,7 +77,7 @@ pub(crate) fn create(
         for exponent in spec.starting_exponent..(spec.starting_exponent + spec.block_count) {
             block_number += 1;
             info!(
-                "  Computing recovery block {}/{}...",
+                "Computing recovery block {}/{}...",
                 block_number, spec.block_count
             );
             let mut recovery_buffer = vec![0u16; slice_size as usize / 2];
