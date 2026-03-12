@@ -77,8 +77,13 @@ fn main() {
     };
 
     if let Err(e) = result {
-        error!("{}: {}", "Error".bold().red(), e);
-        process::exit(1);
+        match e {
+            error::Par2Error::RepairRequired => process::exit(1),
+            _ => {
+                error!("{}: {}", "Error".bold().red(), e);
+                process::exit(1);
+            }
+        }
     }
 
     process::exit(0);

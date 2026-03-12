@@ -8,7 +8,7 @@ use crate::packet::{
 };
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use colored::Colorize;
-use log::info;
+use log::{debug, info};
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
@@ -46,19 +46,17 @@ pub(crate) fn create(
     let source_file_count = file_data.len();
     let recovery_file_count = file_plan.iter().filter(|s| s.block_count > 0).count();
 
-    info!("Block size: {}", slice_size);
+    info!("");
     info!("Source file count: {}", source_file_count);
-    info!("Source block count: {}", total_input_slices);
-    info!("Recovery block count: {}", recovery_block_count);
     info!("Recovery file count: {}", recovery_file_count);
+    debug!("Block size: {} bytes", slice_size);
+    debug!("Source block count: {}", total_input_slices);
+    debug!("Recovery block count: {}", recovery_block_count);
 
     let calculator = GaloisFieldCalculator::new();
     let common = build_common(slice_size, creator, file_data)?;
 
-    if recovery_block_count > 0 {
-        info!("Computing recovery data...");
-    }
-
+    info!("");
     for spec in &file_plan {
         info!("Writing: {}", spec.file_name.bold());
 
@@ -72,8 +70,14 @@ pub(crate) fn create(
         }
 
         let mut recovery_slices: Vec<Par2RecoverySliceData> = Vec::new();
+        let mut block_number = 0u16;
 
         for exponent in spec.starting_exponent..(spec.starting_exponent + spec.block_count) {
+            block_number += 1;
+            info!(
+                "  Computing recovery block {}/{}...",
+                block_number, spec.block_count
+            );
             let mut recovery_buffer = vec![0u16; slice_size as usize / 2];
             let mut global_slice_index = 0;
 

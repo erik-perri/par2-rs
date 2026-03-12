@@ -51,6 +51,85 @@ pub(crate) enum Par2VerificationSliceStatus {
     Valid,
 }
 
+impl Par2VerifiedSet {
+    pub(crate) fn total_data_blocks(&self) -> usize {
+        self.results.iter().map(|r| r.total_slices()).sum()
+    }
+
+    pub(crate) fn available_data_blocks(&self) -> usize {
+        self.results.iter().map(|r| r.valid_slices()).sum()
+    }
+
+    pub(crate) fn recovery_blocks_available(&self) -> usize {
+        self.recovery_slices.len()
+    }
+
+    pub(crate) fn missing_blocks(&self) -> usize {
+        self.total_data_blocks() - self.available_data_blocks()
+    }
+
+    pub(crate) fn is_all_intact(&self) -> bool {
+        self.results.iter().all(|r| r.is_intact())
+    }
+
+    pub(crate) fn is_repair_possible(&self) -> bool {
+        self.missing_blocks() <= self.recovery_blocks_available()
+    }
+
+    pub(crate) fn damaged_file_count(&self) -> usize {
+        self.results.iter().filter(|r| r.is_damaged()).count()
+    }
+
+    pub(crate) fn missing_file_count(&self) -> usize {
+        self.results
+            .iter()
+            .filter(|r| matches!(r, Par2FileVerificationResult::NotFound { .. }))
+            .count()
+    }
+}
+
+impl Par2FileVerificationResult {
+    pub(crate) fn total_slices(&self) -> usize {
+        match self {
+            Par2FileVerificationResult::Found { slices, .. } => slices.len(),
+            Par2FileVerificationResult::NotFound { .. } => 0,
+            Par2FileVerificationResult::FoundWithoutChecksums { .. } => 0,
+            Par2FileVerificationResult::Unreadable { .. } => 0,
+        }
+    }
+
+    pub(crate) fn valid_slices(&self) -> usize {
+        match self {
+            Par2FileVerificationResult::Found { slices, .. } => slices
+                .iter()
+                .filter(|s| matches!(s, Par2VerificationSliceStatus::Valid))
+                .count(),
+            _ => 0,
+        }
+    }
+
+    pub(crate) fn is_intact(&self) -> bool {
+        match self {
+            Par2FileVerificationResult::Found { slices, .. } => slices
+                .iter()
+                .all(|s| matches!(s, Par2VerificationSliceStatus::Valid)),
+            Par2FileVerificationResult::FoundWithoutChecksums { file_intact, .. } => *file_intact,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_damaged(&self) -> bool {
+        match self {
+            Par2FileVerificationResult::Found { slices, .. } => slices
+                .iter()
+                .any(|s| !matches!(s, Par2VerificationSliceStatus::Valid)),
+            Par2FileVerificationResult::FoundWithoutChecksums { file_intact, .. } => !file_intact,
+            Par2FileVerificationResult::Unreadable { .. } => true,
+            _ => false,
+        }
+    }
+}
+
 pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
     let mut results = Vec::new();
 
