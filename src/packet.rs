@@ -13,6 +13,7 @@ pub use recovery_slice::Par2RecoverySliceData;
 pub use slice_checksum::{Par2SliceChecksumData, Par2SliceChecksumEntry};
 
 use crate::error::Par2Error;
+use log::debug;
 use std::fmt::Display;
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -166,7 +167,7 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
 
         let packet_length = header.packet_length as usize;
 
-        println!(
+        debug!(
             "Parsed header {} at [{}], length {}",
             display_packet_type(&header.packet_type),
             header_offset,
@@ -180,7 +181,7 @@ pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Er
             Par2Error::ParseError(format!("invalid body at offset {}: {}", header_offset, e))
         })?;
 
-        println!(
+        debug!(
             "Parsed body at [{}], length {}",
             body_offset,
             body_bytes.len()

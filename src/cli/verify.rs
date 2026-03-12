@@ -1,6 +1,7 @@
 use crate::error::Par2Error;
 use crate::set::Par2ParsedSet;
 use crate::{file, packet, verify};
+use log::{debug, trace};
 use std::path::Path;
 use std::{fs, process};
 
@@ -12,7 +13,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     let mut packets = Vec::new();
 
     for file_path in file_paths {
-        println!("Parsing file: {}", file_path.display());
+        debug!("Parsing file: {}", file_path.display());
 
         let parsed_packets = packet::parse_file(&file_path)?;
 
@@ -27,7 +28,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
 
     let verified_set = verify::verify_set(validated_set, base_path);
 
-    println!("{:#?}", verified_set);
+    trace!("{:#?}", verified_set);
 
     Ok(())
 }

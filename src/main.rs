@@ -8,6 +8,7 @@ mod set;
 mod verify;
 
 use clap::{Parser, Subcommand};
+use log::error;
 use std::path::PathBuf;
 use std::process;
 
@@ -17,6 +18,9 @@ use std::process;
 struct Cli {
     #[command(subcommand)]
     command: Commands,
+
+    #[arg(short = 'v', long = "verbose", action = clap::ArgAction::Count, global = true)]
+    verbose: u8,
 }
 
 #[derive(Subcommand)]
@@ -46,6 +50,18 @@ enum Commands {
 fn main() {
     let cli = Cli::parse();
 
+    let level = match cli.verbose {
+        0 => log::LevelFilter::Info,
+        1 => log::LevelFilter::Debug,
+        _ => log::LevelFilter::Trace,
+    };
+
+    env_logger::Builder::new()
+        .filter_level(level)
+        .format_timestamp(None)
+        .format_target(false)
+        .init();
+
     let result = match cli.command {
         Commands::Create {
             block_size,
@@ -59,7 +75,7 @@ fn main() {
     };
 
     if let Err(e) = result {
-        eprintln!("Error: {}", e);
+        error!("Error: {}", e);
         process::exit(1);
     }
 

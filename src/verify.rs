@@ -2,6 +2,7 @@ use crate::error::Par2Error;
 use crate::file;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData};
 use crate::set::Par2Set;
+use log::debug;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -93,7 +94,7 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
             }
         };
 
-        println!("Verifying file: {} / {}", file_id, file_path.display());
+        debug!("Verifying file: {} / {}", file_id, file_path.display());
 
         let mut slice_statuses = Vec::new();
         let expected_count = file_checksums.entries.len();

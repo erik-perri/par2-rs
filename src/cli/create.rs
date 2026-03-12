@@ -7,6 +7,7 @@ use crate::packet::{
     Par2RecoverySetId, Par2RecoverySliceData, Par2SliceChecksumData,
 };
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use log::debug;
 use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Cursor, Read, Write};
@@ -41,13 +42,13 @@ pub(crate) fn create(
         .map(|d| d.computed_slice_checksums.len())
         .sum();
 
-    println!("Total input slices: {}", total_input_slices);
+    debug!("Total input slices: {}", total_input_slices);
 
     let calculator = GaloisFieldCalculator::new();
     let common = build_common(slice_size, creator, file_data)?;
 
     for spec in &file_plan {
-        println!("Writing {}", spec.file_name);
+        debug!("Writing {}", spec.file_name);
 
         let output_file_path = parent.join(&spec.file_name);
         let mut output_file = File::create(output_file_path)?;
