@@ -105,34 +105,24 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
                         "found".green()
                     );
                 } else {
-                    let valid = result.valid_slices();
-                    let total = slices.len();
-                    info!(
-                        "- Target: {} - {}. Found {} of {} data blocks",
-                        file_name.to_string().bold(),
-                        "damaged".red(),
-                        valid,
-                        total
-                    );
-                }
-            }
-            Par2FileVerificationResult::FoundWithoutChecksums {
-                file_name,
-                file_intact,
-                ..
-            } => {
-                if *file_intact {
-                    info!(
-                        "- Target: {} - {}",
-                        file_name.to_string().bold(),
-                        "found".green()
-                    );
-                } else {
-                    info!(
-                        "- Target: {} - {} (no block checksums available)",
-                        file_name.to_string().bold(),
-                        "damaged".red()
-                    );
+                    let found_slices = result.found_slices();
+                    if found_slices > 0 {
+                        let valid = result.valid_slices();
+                        let total = slices.len();
+                        info!(
+                            "- Target: {} - {}. Found {} of {} data blocks",
+                            file_name.to_string().bold(),
+                            "damaged".red(),
+                            valid,
+                            total
+                        );
+                    } else {
+                        info!(
+                            "- Target: {} - {} (no block checksums available)",
+                            file_name.to_string().bold(),
+                            "damaged".red()
+                        );
+                    }
                 }
             }
             Par2FileVerificationResult::NotFound { file_path, .. } => {
@@ -155,8 +145,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     info!("");
 
     if verified_set.is_all_intact() {
-        info!("{}", "Repair not required.".green());
-        info!("{}", "Done".green().bold());
+        info!("{}", "Repair not required.".green().bold());
         return Ok(());
     }
 
@@ -184,18 +173,31 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     if verified_set.is_repair_possible() {
         let extra = recovery - verified_set.missing_blocks();
         if extra > 0 {
-            info!("Repair is possible, {} extra recovery blocks.", extra);
+            info!(
+                "{}",
+                format!("Repair is possible, {} extra recovery blocks.", extra)
+                    .yellow()
+                    .bold()
+            );
         } else {
-            info!("Repair is possible with no blocks to spare.");
+            info!(
+                "{}",
+                "Repair is possible with no blocks to spare."
+                    .yellow()
+                    .bold()
+            );
         }
     } else {
         info!(
-            "You need {} more recovery blocks for repair.",
-            verified_set.missing_blocks() - recovery,
+            "{}",
+            format!(
+                "You need {} more recovery blocks for repair.",
+                verified_set.missing_blocks() - recovery
+            )
+            .red()
+            .bold(),
         );
     }
-
-    info!("{}", "Done".red().bold());
 
     Err(Par2Error::RepairRequired)
 }

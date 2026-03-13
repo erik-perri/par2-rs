@@ -17,20 +17,13 @@ pub(crate) struct Par2VerifiedSet {
 #[derive(Debug)]
 pub(crate) enum Par2FileVerificationResult {
     Found {
+        computed_md5: Par2Md5Hash,
+        expected_md5: Par2Md5Hash,
         file_id: Par2FileId,
         file_length: u64,
-        file_md5: Par2Md5Hash,
         file_name: String,
         file_path: PathBuf,
         slices: Vec<Par2VerificationSliceStatus>,
-    },
-    FoundWithoutChecksums {
-        file_id: Par2FileId,
-        file_intact: bool,
-        file_length: u64,
-        file_md5: Par2Md5Hash,
-        file_name: String,
-        file_path: PathBuf,
     },
     NotFound {
         file_id: Par2FileId,
@@ -53,7 +46,7 @@ pub(crate) enum Par2VerificationSliceStatus {
 
 impl Par2VerifiedSet {
     pub(crate) fn total_data_blocks(&self) -> usize {
-        self.results.iter().map(|r| r.total_slices()).sum()
+        self.results.iter().map(|r| r.found_slices()).sum()
     }
 
     pub(crate) fn available_data_blocks(&self) -> usize {
@@ -89,12 +82,18 @@ impl Par2VerifiedSet {
 }
 
 impl Par2FileVerificationResult {
-    pub(crate) fn total_slices(&self) -> usize {
+    pub(crate) fn file_path(&self) -> &PathBuf {
+        match self {
+            Par2FileVerificationResult::Found { file_path, .. } => file_path,
+            Par2FileVerificationResult::NotFound { file_path, .. } => file_path,
+            Par2FileVerificationResult::Unreadable { file_path, .. } => file_path,
+        }
+    }
+
+    pub(crate) fn found_slices(&self) -> usize {
         match self {
             Par2FileVerificationResult::Found { slices, .. } => slices.len(),
-            Par2FileVerificationResult::NotFound { .. } => 0,
-            Par2FileVerificationResult::FoundWithoutChecksums { .. } => 0,
-            Par2FileVerificationResult::Unreadable { .. } => 0,
+            _ => 0,
         }
     }
 
@@ -110,20 +109,29 @@ impl Par2FileVerificationResult {
 
     pub(crate) fn is_intact(&self) -> bool {
         match self {
-            Par2FileVerificationResult::Found { slices, .. } => slices
-                .iter()
-                .all(|s| matches!(s, Par2VerificationSliceStatus::Valid)),
-            Par2FileVerificationResult::FoundWithoutChecksums { file_intact, .. } => *file_intact,
+            Par2FileVerificationResult::Found {
+                computed_md5,
+                expected_md5,
+                ..
+            } => computed_md5 == expected_md5,
             _ => false,
         }
     }
 
     pub(crate) fn is_damaged(&self) -> bool {
         match self {
-            Par2FileVerificationResult::Found { slices, .. } => slices
-                .iter()
-                .any(|s| !matches!(s, Par2VerificationSliceStatus::Valid)),
-            Par2FileVerificationResult::FoundWithoutChecksums { file_intact, .. } => !file_intact,
+            Par2FileVerificationResult::Found {
+                computed_md5,
+                expected_md5,
+                ..
+            } => computed_md5 != expected_md5,
+            Par2FileVerificationResult::Unreadable { .. } => true,
+            _ => false,
+        }
+    }
+
+    pub(crate) fn is_unreadable(&self) -> bool {
+        match self {
             Par2FileVerificationResult::Unreadable { .. } => true,
             _ => false,
         }
@@ -161,13 +169,14 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
         let file_checksums = match set.slice_checksums.get(&file_id) {
             Some(checksum) => checksum,
             None => {
-                results.push(Par2FileVerificationResult::FoundWithoutChecksums {
+                results.push(Par2FileVerificationResult::Found {
+                    computed_md5: computed_checksums.file_md5,
+                    expected_md5: file_description.file_md5,
                     file_id,
-                    file_intact: file_description.file_md5 == computed_checksums.file_md5,
                     file_length: computed_checksums.file_length,
-                    file_md5: computed_checksums.file_md5,
                     file_name: file_path.file_name().unwrap().to_string_lossy().to_string(),
                     file_path: file_path.clone(),
+                    slices: vec![],
                 });
                 continue;
             }
@@ -195,9 +204,10 @@ pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
         }
 
         results.push(Par2FileVerificationResult::Found {
+            computed_md5: computed_checksums.file_md5,
+            expected_md5: file_description.file_md5,
             file_id,
             file_length: computed_checksums.file_length,
-            file_md5: computed_checksums.file_md5,
             file_name: file_path.file_name().unwrap().to_string_lossy().to_string(),
             file_path: file_path.clone(),
             slices: slice_statuses,
