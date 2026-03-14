@@ -119,7 +119,7 @@ mod tests {
             let base_path = Path::new("/test");
             let input_path = "../file.txt";
 
-            let result = get_sanitized_file_path(&base_path, &input_path);
+            let result = get_sanitized_file_path(base_path, input_path);
             let err = result.unwrap_err();
 
             assert!(matches!(err, Par2Error::FilePathError(_)));
@@ -134,7 +134,7 @@ mod tests {
             let base_path = Path::new("/test");
             let input_path = "/file.txt";
 
-            let result = get_sanitized_file_path(&base_path, &input_path);
+            let result = get_sanitized_file_path(base_path, input_path);
             let err = result.unwrap_err();
 
             assert!(matches!(err, Par2Error::FilePathError(_)));
@@ -150,7 +150,7 @@ mod tests {
             let base_path = Path::new("/test");
             let input_path = "C:\\file.txt";
 
-            let result = get_sanitized_file_path(&base_path, &input_path);
+            let result = get_sanitized_file_path(base_path, input_path);
             let err = result.unwrap_err();
 
             assert!(matches!(err, Par2Error::FilePathError(_)));
@@ -165,7 +165,7 @@ mod tests {
             let base_path = Path::new("/test");
             let input_path = "./.";
 
-            let result = get_sanitized_file_path(&base_path, &input_path);
+            let result = get_sanitized_file_path(base_path, input_path);
             let err = result.unwrap_err();
 
             assert!(matches!(err, Par2Error::FilePathError(_)));
@@ -177,7 +177,7 @@ mod tests {
             let base_path = Path::new("/test");
             let input_path = "./why/./file.txt";
 
-            let result = get_sanitized_file_path(&base_path, &input_path);
+            let result = get_sanitized_file_path(base_path, input_path);
             let output = result.unwrap();
 
             assert_eq!(output, PathBuf::from("/test/why/file.txt"));

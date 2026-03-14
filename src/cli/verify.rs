@@ -124,7 +124,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
                     );
                 }
             }
-            Par2VerificationStatus::NotFound { .. } => {
+            Par2VerificationStatus::NotFound => {
                 info!("- Target: {} - {}", file_name, "missing".red());
             }
             Par2VerificationStatus::Unreadable { error } => {
@@ -154,13 +154,9 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     let damaged = verified_set
         .results
         .iter()
-        .filter(|r| {
-            return match &r.status {
-                Par2VerificationStatus::Found { computed_md5, .. } => {
-                    computed_md5 != &r.expected_md5
-                }
-                _ => false,
-            };
+        .filter(|r| match &r.status {
+            Par2VerificationStatus::Found { computed_md5, .. } => computed_md5 != &r.expected_md5,
+            _ => false,
         })
         .count();
     if damaged > 0 {
