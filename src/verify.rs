@@ -1,5 +1,6 @@
 use crate::error::Par2Error;
 use crate::file;
+use crate::file_name::get_sanitized_file_path;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData};
 use crate::set::Par2Set;
 use log::debug;
@@ -43,12 +44,11 @@ pub(crate) struct Par2FileVerificationResult {
     pub(crate) status: Par2VerificationStatus,
 }
 
-pub(crate) fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
+pub(crate) fn verify_set(set: Par2Set, base_path: &Path) -> Result<Par2VerifiedSet, Par2Error> {
     let mut results = Vec::new();
 
     for (file_id, file_description) in set.file_descriptions.into_iter() {
-        // TODO Join Path::new(file_name).file_name() to strip paths
-        let file_path = base_path.join(file_description.file_name);
+        let file_path = get_sanitized_file_path(base_path, &file_description.file_name)?;
         let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
 
         if !file_path.is_file() {
@@ -130,11 +130,11 @@ pub(crate) fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
         });
     }
 
-    Par2VerifiedSet {
+    Ok(Par2VerifiedSet {
         slice_size: set.main.slice_size,
         results,
         recovery_slices: set.recovery_slices,
         recovery_file_ids: set.main.recovery_file_ids,
         non_recovery_file_ids: set.main.non_recovery_file_ids,
-    }
+    })
 }

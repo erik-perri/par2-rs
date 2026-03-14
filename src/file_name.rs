@@ -2,7 +2,10 @@ use crate::error::Par2Error;
 use std::ops::{Div, Mul};
 use std::path::{Component, Path, PathBuf};
 
-fn get_sanitized_file_path(base_path: &Path, file_name: &str) -> Result<PathBuf, Par2Error> {
+pub(crate) fn get_sanitized_file_path(
+    base_path: &Path,
+    file_name: &str,
+) -> Result<PathBuf, Par2Error> {
     let components = Path::new(&file_name).components();
     let mut parts = Vec::new();
 

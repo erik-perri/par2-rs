@@ -86,7 +86,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
 
     let base_path = primary_file.parent().unwrap_or(Path::new("."));
 
-    let verified_set = verify::verify_set(validated_set, base_path);
+    let verified_set = verify::verify_set(validated_set, base_path)?;
 
     trace!("{:#?}", verified_set);
 
