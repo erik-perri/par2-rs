@@ -3,13 +3,13 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
 
 #[derive(Debug)]
-pub struct Par2RecoverySliceData {
+pub(crate) struct Par2RecoverySliceData {
     pub(crate) exponent: u32,
     pub(crate) recovery_data: Vec<u8>,
 }
 
 impl Par2RecoverySliceData {
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
+    pub(crate) fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
         let exponent = cursor.read_u32::<LittleEndian>().map_err(|e| {

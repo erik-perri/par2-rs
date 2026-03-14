@@ -7,7 +7,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use md5::{Digest, Md5};
 use std::io::{Cursor, Read, Write};
 
-pub struct Par2PacketHeader {
+pub(crate) struct Par2PacketHeader {
     pub(crate) packet_length: u64,
     pub(crate) expected_md5: Par2Md5Hash,
     pub(crate) computed_md5: Par2Md5Hash,
@@ -16,7 +16,7 @@ pub struct Par2PacketHeader {
 }
 
 impl Par2PacketHeader {
-    pub fn from_body(
+    pub(crate) fn from_body(
         recovery_set_id: &Par2RecoverySetId,
         packet_type: &Par2PacketType,
         body_data: &[u8],
@@ -40,7 +40,7 @@ impl Par2PacketHeader {
         }
     }
 
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
+    pub(crate) fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
         let mut magic_bytes = [0; PAR2_PACKET_MAGIC_HEADER.len()];

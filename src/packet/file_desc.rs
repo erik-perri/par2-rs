@@ -6,7 +6,7 @@ use std::io::{Cursor, Read, Write};
 use super::{Par2FileId, Par2Md5Hash, trim_trailing_null_bytes};
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Par2FileDescriptionData {
+pub(crate) struct Par2FileDescriptionData {
     pub(crate) file_md5: Par2Md5Hash,
     pub(crate) file_first_16kb_md5: Par2Md5Hash,
     pub(crate) file_length: u64,
@@ -14,7 +14,7 @@ pub struct Par2FileDescriptionData {
 }
 
 impl Par2FileDescriptionData {
-    pub fn file_id(&self) -> Par2FileId {
+    pub(crate) fn file_id(&self) -> Par2FileId {
         let mut hasher = Md5::new();
 
         hasher.update(self.file_first_16kb_md5.as_ref());
@@ -25,7 +25,7 @@ impl Par2FileDescriptionData {
         Par2FileId::from(computed_file_id)
     }
 
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
+    pub(crate) fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
         let mut file_id = [0u8; 16];
@@ -80,7 +80,7 @@ impl Par2FileDescriptionData {
         Ok(parsed_data)
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
         let file_id = self.file_id();
 
         let mut cursor = Cursor::new(Vec::new());

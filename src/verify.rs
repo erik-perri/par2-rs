@@ -43,7 +43,7 @@ pub(crate) struct Par2FileVerificationResult {
     pub(crate) status: Par2VerificationStatus,
 }
 
-pub fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
+pub(crate) fn verify_set(set: Par2Set, base_path: &Path) -> Par2VerifiedSet {
     let mut results = Vec::new();
 
     for (file_id, file_description) in set.file_descriptions.into_iter() {

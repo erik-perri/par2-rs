@@ -1,7 +1,7 @@
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2PacketType, Par2RecoverySetId};
 
 #[derive(Debug)]
-pub enum Par2Error {
+pub(crate) enum Par2Error {
     AllFileDescriptionsCorrupt,
     AllSliceChecksumsCorrupt,
     DuplicateInputFile,
@@ -52,7 +52,7 @@ impl std::fmt::Display for Par2Error {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum Par2WarningDataType {
+pub(crate) enum Par2WarningDataType {
     FileDescription,
     SliceChecksum,
     RecoverySlice,
@@ -71,7 +71,7 @@ impl std::fmt::Display for Par2WarningDataType {
 }
 
 #[derive(Debug)]
-pub enum Par2Warning {
+pub(crate) enum Par2Warning {
     AllRecoverySlicesCorrupt,
     IntegrityFailure(Par2WarningDataType, Par2Md5Hash, Par2Md5Hash),
     MissingCreator,

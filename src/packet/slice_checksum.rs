@@ -5,19 +5,19 @@ use std::io::{Cursor, Read, Write};
 use super::{Par2FileId, Par2Md5Hash};
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Par2SliceChecksumData {
+pub(crate) struct Par2SliceChecksumData {
     pub(crate) file_id: Par2FileId,
     pub(crate) entries: Vec<Par2SliceChecksumEntry>,
 }
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct Par2SliceChecksumEntry {
+pub(crate) struct Par2SliceChecksumEntry {
     pub(crate) md5: Par2Md5Hash,
     pub(crate) crc32: u32,
 }
 
 impl Par2SliceChecksumData {
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
+    pub(crate) fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
         let mut file_id: Par2FileId = Par2FileId([0; 16]);

@@ -6,14 +6,14 @@ use std::io::{Cursor, Read, Write};
 use super::{Par2FileId, Par2Md5Hash, Par2RecoverySetId};
 
 #[derive(Debug)]
-pub struct Par2MainData {
+pub(crate) struct Par2MainData {
     pub(crate) non_recovery_file_ids: Vec<Par2FileId>,
     pub(crate) recovery_file_ids: Vec<Par2FileId>,
     pub(crate) slice_size: u64,
 }
 
 impl Par2MainData {
-    pub fn recovery_set_id(&self) -> Par2RecoverySetId {
+    pub(crate) fn recovery_set_id(&self) -> Par2RecoverySetId {
         let mut hasher = Md5::new();
 
         hasher.update(self.slice_size.to_le_bytes());
@@ -31,7 +31,7 @@ impl Par2MainData {
         Par2RecoverySetId::from(computed_md5)
     }
 
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
+    pub(crate) fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let mut cursor = Cursor::new(data);
 
         let slice_size = cursor
@@ -91,7 +91,7 @@ impl Par2MainData {
         })
     }
 
-    pub fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
+    pub(crate) fn to_bytes(&self) -> Result<Vec<u8>, Par2Error> {
         let capacity =
             8 + 4 + (self.recovery_file_ids.len() * 16) + (self.non_recovery_file_ids.len() * 16);
         let mut cursor = Cursor::new(Vec::with_capacity(capacity));

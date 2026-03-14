@@ -5,19 +5,19 @@ mod main;
 mod recovery_slice;
 mod slice_checksum;
 
-pub use creator::Par2CreatorData;
-pub use file_desc::Par2FileDescriptionData;
-pub use header::Par2PacketHeader;
-pub use main::Par2MainData;
-pub use recovery_slice::Par2RecoverySliceData;
-pub use slice_checksum::{Par2SliceChecksumData, Par2SliceChecksumEntry};
+pub(crate) use creator::Par2CreatorData;
+pub(crate) use file_desc::Par2FileDescriptionData;
+pub(crate) use header::Par2PacketHeader;
+pub(crate) use main::Par2MainData;
+pub(crate) use recovery_slice::Par2RecoverySliceData;
+pub(crate) use slice_checksum::{Par2SliceChecksumData, Par2SliceChecksumEntry};
 
 use crate::error::Par2Error;
 use log::debug;
 use std::fmt::Display;
 
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct Par2FileId(pub(crate) [u8; 16]);
+pub(crate) struct Par2FileId(pub(crate) [u8; 16]);
 
 impl std::fmt::Debug for Par2FileId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -50,7 +50,7 @@ impl Display for Par2FileId {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct Par2Md5Hash(pub(crate) [u8; 16]);
+pub(crate) struct Par2Md5Hash(pub(crate) [u8; 16]);
 
 impl std::fmt::Debug for Par2Md5Hash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -71,7 +71,7 @@ impl AsRef<[u8]> for Par2Md5Hash {
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
-pub struct Par2RecoverySetId(pub(crate) [u8; 16]);
+pub(crate) struct Par2RecoverySetId(pub(crate) [u8; 16]);
 
 impl AsMut<[u8]> for Par2RecoverySetId {
     fn as_mut(&mut self) -> &mut [u8] {
@@ -97,15 +97,15 @@ impl std::fmt::Debug for Par2RecoverySetId {
     }
 }
 
-pub type Par2PacketType = [u8; 16];
+pub(crate) type Par2PacketType = [u8; 16];
 
-pub struct Par2Packet {
+pub(crate) struct Par2Packet {
     pub(crate) header: Par2PacketHeader,
     pub(crate) body: Par2PacketBody,
 }
 
 #[derive(Debug)]
-pub enum Par2PacketBody {
+pub(crate) enum Par2PacketBody {
     Main(Par2MainData),
     FileDesc(Par2FileDescriptionData),
     SliceChecksum(Par2SliceChecksumData),
@@ -138,17 +138,17 @@ impl Par2PacketBody {
     }
 }
 
-pub const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
-pub const PAR2_PACKET_MAGIC_MAIN: &Par2PacketType = b"PAR 2.0\0Main\0\0\0\0";
-pub const PAR2_PACKET_MAGIC_FILE_DESC: &Par2PacketType = b"PAR 2.0\0FileDesc";
-pub const PAR2_PACKET_MAGIC_SLICE_CHECKSUM: &Par2PacketType = b"PAR 2.0\0IFSC\0\0\0\0";
-pub const PAR2_PACKET_MAGIC_RECOVERY_SLICE: &Par2PacketType = b"PAR 2.0\0RecvSlic";
-pub const PAR2_PACKET_MAGIC_CREATOR: &Par2PacketType = b"PAR 2.0\0Creator\0";
+pub(crate) const PAR2_PACKET_MAGIC_HEADER: &[u8] = b"PAR2\0PKT";
+pub(crate) const PAR2_PACKET_MAGIC_MAIN: &Par2PacketType = b"PAR 2.0\0Main\0\0\0\0";
+pub(crate) const PAR2_PACKET_MAGIC_FILE_DESC: &Par2PacketType = b"PAR 2.0\0FileDesc";
+pub(crate) const PAR2_PACKET_MAGIC_SLICE_CHECKSUM: &Par2PacketType = b"PAR 2.0\0IFSC\0\0\0\0";
+pub(crate) const PAR2_PACKET_MAGIC_RECOVERY_SLICE: &Par2PacketType = b"PAR 2.0\0RecvSlic";
+pub(crate) const PAR2_PACKET_MAGIC_CREATOR: &Par2PacketType = b"PAR 2.0\0Creator\0";
 
 const PAR2_HEADER_SIZE: usize = 64;
 const PAR2_HASH_START_OFFSET: usize = 32;
 
-pub fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error> {
+pub(crate) fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>, Par2Error> {
     let file_data = std::fs::read(file_path)?;
     let file_size = file_data.len();
     let mut offset = 0;

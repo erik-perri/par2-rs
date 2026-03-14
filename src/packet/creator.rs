@@ -4,12 +4,12 @@ use std::io::{Cursor, Write};
 use super::trim_trailing_null_bytes;
 
 #[derive(Debug)]
-pub struct Par2CreatorData {
+pub(crate) struct Par2CreatorData {
     pub(crate) name: String,
 }
 
 impl Par2CreatorData {
-    pub fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
+    pub(crate) fn from_bytes(data: &[u8]) -> Result<Self, Par2Error> {
         let name_bytes = trim_trailing_null_bytes(data);
         let name = match String::from_utf8(name_bytes.to_vec()) {
             Ok(name) => name,

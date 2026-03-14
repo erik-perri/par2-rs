@@ -37,7 +37,7 @@ pub(crate) struct Par2Set {
 }
 
 impl Par2ParsedSet {
-    pub fn from_packets(packets: Vec<Par2Packet>) -> Result<Par2ParsedSet, Par2Error> {
+    pub(crate) fn from_packets(packets: Vec<Par2Packet>) -> Result<Par2ParsedSet, Par2Error> {
         let mut recovery_set_id = None;
         let mut main: Option<Parsed<Par2MainData>> = None;
         let mut file_descriptions = Vec::new();
@@ -125,7 +125,7 @@ impl Par2ParsedSet {
         })
     }
 
-    pub fn validate(self) -> Result<Par2Set, Par2Error> {
+    pub(crate) fn validate(self) -> Result<Par2Set, Par2Error> {
         if self.main.computed_md5 != self.main.expected_md5
             || self.main.recovery_set_id != self.main.data.recovery_set_id()
         {

@@ -112,7 +112,7 @@ pub(crate) fn compute_file_id(
     Par2FileId::from(computed_file_id)
 }
 
-pub fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
+pub(crate) fn locate_files(base: &Path) -> Result<Vec<PathBuf>, Par2Error> {
     if !base.is_file() {
         return Err(Par2Error::FilePathError(format!(
             "\"{}\" is not a valid file",
