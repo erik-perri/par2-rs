@@ -1,6 +1,35 @@
 use crate::error::Par2Error;
 use std::ops::{Div, Mul};
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
+
+fn get_sanitized_file_path(base_path: &Path, file_name: &str) -> Result<PathBuf, Par2Error> {
+    let components = Path::new(&file_name).components();
+    let mut parts = Vec::new();
+
+    for component in components {
+        match component {
+            Component::Normal(seg) => parts.push(seg),
+            Component::CurDir => continue,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(Par2Error::FilePathError(format!(
+                    "file \"{}\" contains unsupported path",
+                    file_name
+                )));
+            }
+        }
+    }
+
+    if parts.is_empty() {
+        return Err(Par2Error::FilePathError(format!(
+            "file \"{}\" resolved to empty path",
+            file_name
+        )));
+    }
+
+    let safe_path: PathBuf = parts.into_iter().collect();
+
+    Ok(base_path.join(safe_path))
+}
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) struct Par2FileSpec {
@@ -79,50 +108,126 @@ fn calculate_par2_padding_width(recovery_block_count: u16) -> usize {
 mod tests {
     use super::*;
 
-    #[test]
-    fn produces_expected_output() {
-        let path = Path::new("test.dat");
-        let files = plan_recovery_files(path, 15).expect("failed to build recovery files");
+    mod get_sanitized_file_path {
+        use super::*;
 
-        assert_eq!(
-            files,
-            vec![
-                Par2FileSpec {
-                    file_name: "test.par2".into(),
-                    starting_exponent: 0,
-                    block_count: 0
-                },
-                Par2FileSpec {
-                    file_name: "test.vol00+1.par2".into(),
-                    starting_exponent: 0,
-                    block_count: 1
-                },
-                Par2FileSpec {
-                    file_name: "test.vol01+2.par2".into(),
-                    starting_exponent: 1,
-                    block_count: 2
-                },
-                Par2FileSpec {
-                    file_name: "test.vol03+4.par2".into(),
-                    starting_exponent: 3,
-                    block_count: 4
-                },
-                Par2FileSpec {
-                    file_name: "test.vol07+8.par2".into(),
-                    starting_exponent: 7,
-                    block_count: 8
-                },
-            ]
-        );
+        #[test]
+        fn rejects_parent_paths() {
+            let base_path = Path::new("/test");
+            let input_path = "../file.txt";
+
+            let result = get_sanitized_file_path(&base_path, &input_path);
+            let err = result.unwrap_err();
+
+            assert!(matches!(err, Par2Error::FilePathError(_)));
+            assert_eq!(
+                err.to_string(),
+                "file \"../file.txt\" contains unsupported path",
+            );
+        }
+
+        #[test]
+        fn rejects_absolute_paths() {
+            let base_path = Path::new("/test");
+            let input_path = "/file.txt";
+
+            let result = get_sanitized_file_path(&base_path, &input_path);
+            let err = result.unwrap_err();
+
+            assert!(matches!(err, Par2Error::FilePathError(_)));
+            assert_eq!(
+                err.to_string(),
+                "file \"/file.txt\" contains unsupported path",
+            );
+        }
+
+        #[test]
+        fn rejects_prefixed_paths() {
+            let base_path = Path::new("/test");
+            let input_path = "C:\\file.txt";
+
+            let result = get_sanitized_file_path(&base_path, &input_path);
+            let err = result.unwrap_err();
+
+            assert!(matches!(err, Par2Error::FilePathError(_)));
+            assert_eq!(
+                err.to_string(),
+                "file \"C:\\file.txt\" contains unsupported path",
+            );
+        }
+
+        #[test]
+        fn rejects_empty_paths() {
+            let base_path = Path::new("/test");
+            let input_path = "./.";
+
+            let result = get_sanitized_file_path(&base_path, &input_path);
+            let err = result.unwrap_err();
+
+            assert!(matches!(err, Par2Error::FilePathError(_)));
+            assert_eq!(err.to_string(), "file \"./.\" resolved to empty path");
+        }
+
+        #[test]
+        fn normalizes_weird_paths() {
+            let base_path = Path::new("/test");
+            let input_path = "./why/./file.txt";
+
+            let result = get_sanitized_file_path(&base_path, &input_path);
+            let output = result.unwrap();
+
+            assert_eq!(output, PathBuf::from("/test/why/file.txt"));
+        }
     }
 
-    #[test]
-    fn has_consistent_padding() {
-        let path = Path::new("test.dat");
-        let files = plan_recovery_files(path, 127).expect("failed to build recovery files");
+    mod plan_recovery_files {
+        use super::*;
 
-        assert_eq!(files.len(), 8);
-        assert_eq!(files[1].file_name, "test.vol000+01.par2");
-        assert_eq!(files[7].file_name, "test.vol063+64.par2");
+        #[test]
+        fn produces_expected_output() {
+            let path = Path::new("test.dat");
+            let files = plan_recovery_files(path, 15).expect("failed to build recovery files");
+
+            assert_eq!(
+                files,
+                vec![
+                    Par2FileSpec {
+                        file_name: "test.par2".into(),
+                        starting_exponent: 0,
+                        block_count: 0
+                    },
+                    Par2FileSpec {
+                        file_name: "test.vol00+1.par2".into(),
+                        starting_exponent: 0,
+                        block_count: 1
+                    },
+                    Par2FileSpec {
+                        file_name: "test.vol01+2.par2".into(),
+                        starting_exponent: 1,
+                        block_count: 2
+                    },
+                    Par2FileSpec {
+                        file_name: "test.vol03+4.par2".into(),
+                        starting_exponent: 3,
+                        block_count: 4
+                    },
+                    Par2FileSpec {
+                        file_name: "test.vol07+8.par2".into(),
+                        starting_exponent: 7,
+                        block_count: 8
+                    },
+                ]
+            );
+        }
+
+        #[test]
+        fn has_consistent_padding() {
+            let path = Path::new("test.dat");
+            let files = plan_recovery_files(path, 127).expect("failed to build recovery files");
+
+            assert_eq!(files.len(), 8);
+            assert_eq!(files[1].file_name, "test.vol000+01.par2");
+            assert_eq!(files[7].file_name, "test.vol063+64.par2");
+        }
     }
 }
