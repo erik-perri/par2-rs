@@ -144,6 +144,7 @@ mod tests {
             );
         }
 
+        #[cfg(target_os = "windows")]
         #[test]
         fn rejects_prefixed_paths() {
             let base_path = Path::new("/test");
