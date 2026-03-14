@@ -1,7 +1,7 @@
 use crate::error::Par2Error;
 use crate::packet::PAR2_PACKET_MAGIC_RECOVERY_SLICE;
 use crate::set::Par2ParsedSet;
-use crate::verify::Par2FileVerificationResult;
+use crate::verify::{Par2VerificationSliceStatus, Par2VerificationStatus};
 use crate::{file, packet, verify};
 use colored::Colorize;
 use log::{debug, info, trace, warn};
@@ -94,84 +94,111 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     info!("Verifying files:");
 
     for result in &verified_set.results {
-        match result {
-            Par2FileVerificationResult::Found {
-                file_name, slices, ..
+        let file_name = result.file_name.bold();
+
+        match &result.status {
+            Par2VerificationStatus::Found {
+                computed_md5,
+                slices,
             } => {
-                if result.is_intact() {
+                if computed_md5 == &result.expected_md5 {
+                    info!("- Target: {} - {}", file_name, "found".green());
+                } else if slices.is_empty() {
                     info!(
-                        "- Target: {} - {}",
-                        file_name.to_string().bold(),
-                        "found".green()
+                        "- Target: {} - {} (no block checksums available)",
+                        file_name,
+                        "damaged".red()
                     );
                 } else {
-                    let found_slices = result.found_slices();
-                    if found_slices > 0 {
-                        let valid = result.valid_slices();
-                        let total = slices.len();
-                        info!(
-                            "- Target: {} - {}. Found {} of {} data blocks",
-                            file_name.to_string().bold(),
-                            "damaged".red(),
-                            valid,
-                            total
-                        );
-                    } else {
-                        info!(
-                            "- Target: {} - {} (no block checksums available)",
-                            file_name.to_string().bold(),
-                            "damaged".red()
-                        );
-                    }
+                    let valid = slices
+                        .iter()
+                        .filter(|s| matches!(s, Par2VerificationSliceStatus::Valid))
+                        .count();
+
+                    info!(
+                        "- Target: {} - {}. Found {} of {} data blocks",
+                        file_name,
+                        "damaged".red(),
+                        valid,
+                        slices.len(),
+                    );
                 }
             }
-            Par2FileVerificationResult::NotFound { file_path, .. } => {
-                let name = file_path
-                    .file_name()
-                    .map(|n| n.to_string_lossy())
-                    .unwrap_or_default();
-                info!("- Target: {} - {}", name.bold(), "missing".red());
+            Par2VerificationStatus::NotFound { .. } => {
+                info!("- Target: {} - {}", file_name, "missing".red());
             }
-            Par2FileVerificationResult::Unreadable { file_path, .. } => {
-                let name = file_path
-                    .file_name()
-                    .map(|n| n.to_string_lossy())
-                    .unwrap_or_default();
-                info!("- Target: {} - {}", name.bold(), "unreadable".red());
+            Par2VerificationStatus::Unreadable { error } => {
+                info!(
+                    "- Target: {} - {} {}",
+                    file_name,
+                    "unreadable".red(),
+                    error.to_string().dimmed()
+                );
             }
         }
     }
 
     info!("");
 
-    if verified_set.is_all_intact() {
+    let all_intact = verified_set.results.iter().all(|r| match &r.status {
+        Par2VerificationStatus::Found { computed_md5, .. } => computed_md5 == &r.expected_md5,
+        _ => false,
+    });
+    if all_intact {
         info!("{}", "Repair not required.".green().bold());
         return Ok(());
     }
 
     info!("Repair is required.");
 
-    let damaged = verified_set.damaged_file_count();
+    let damaged = verified_set
+        .results
+        .iter()
+        .filter(|r| {
+            return match &r.status {
+                Par2VerificationStatus::Found { computed_md5, .. } => {
+                    computed_md5 != &r.expected_md5
+                }
+                _ => false,
+            };
+        })
+        .count();
     if damaged > 0 {
         info!("{} file(s) exist but are damaged.", damaged);
     }
 
-    let missing = verified_set.missing_file_count();
+    let missing = verified_set
+        .results
+        .iter()
+        .filter(|r| matches!(r.status, Par2VerificationStatus::NotFound))
+        .count();
     if missing > 0 {
         info!("{} file(s) are missing.", missing);
     }
 
-    let available = verified_set.available_data_blocks();
+    let available: usize = verified_set
+        .results
+        .iter()
+        .map(|r| match &r.status {
+            Par2VerificationStatus::Found { slices, .. } => slices
+                .iter()
+                .filter(|s| matches!(s, Par2VerificationSliceStatus::Valid))
+                .count(),
+            _ => 0,
+        })
+        .sum();
     info!(
         "You have {} out of {} data blocks available.",
         available, total_data_blocks
     );
 
-    let recovery = verified_set.recovery_blocks_available();
+    let recovery = verified_set.recovery_slices.len();
     info!("You have {} recovery blocks available.", recovery);
 
-    if verified_set.is_repair_possible() {
-        let extra = recovery - verified_set.missing_blocks();
+    let missing = total_data_blocks - available;
+
+    if recovery > missing {
+        let extra = recovery - missing;
         if extra > 0 {
             info!(
                 "{}",
@@ -192,7 +219,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
             "{}",
             format!(
                 "You need {} more recovery blocks for repair.",
-                verified_set.missing_blocks() - recovery
+                missing - recovery
             )
             .red()
             .bold(),
