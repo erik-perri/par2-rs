@@ -207,6 +207,22 @@ impl Par2ParsedSet {
     }
 }
 
+impl Par2Set {
+    pub(crate) fn total_data_blocks(&self) -> usize {
+        self.slice_checksums
+            .values()
+            .map(|sc| sc.entries.len())
+            .sum()
+    }
+
+    pub(crate) fn total_file_size(&self) -> u64 {
+        self.file_descriptions
+            .values()
+            .map(|fd| fd.file_length)
+            .sum()
+    }
+}
+
 fn validate_and_filter<T>(
     data_type: Par2WarningDataType,
     data: Vec<Parsed<T>>,

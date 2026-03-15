@@ -1,6 +1,7 @@
 use crate::error::Par2Error;
 use crate::packet::PAR2_PACKET_MAGIC_RECOVERY_SLICE;
 use crate::set::Par2ParsedSet;
+use crate::verify::Par2VerifiedSet;
 use crate::{file, packet, verify};
 use colored::Colorize;
 use log::{debug, info, warn};
@@ -85,7 +86,7 @@ pub(crate) fn repair(path: &Path) -> Result<(), Par2Error> {
 
     let base_path = primary_file.parent().unwrap_or(Path::new("."));
 
-    let verified_set = verify::verify_set(validated_set, base_path);
+    let verified_set = Par2VerifiedSet::new(validated_set, base_path)?;
 
     info!("");
 
