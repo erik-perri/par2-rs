@@ -309,7 +309,6 @@ mod tests {
 
     mod par2_parsed_set {
         use super::*;
-        use crate::packet::Par2PacketHeader;
 
         mod from_packets {
             use super::*;
