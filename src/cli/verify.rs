@@ -1,6 +1,6 @@
 use crate::error::Par2Error;
 use crate::packet::PAR2_PACKET_MAGIC_RECOVERY_SLICE;
-use crate::set::Par2ParsedSet;
+use crate::set::{Par2ParsedSet, Par2Set};
 use crate::verify::{Par2VerificationSliceStatus, Par2VerificationStatus, Par2VerifiedSet};
 use crate::{file, packet};
 use colored::Colorize;
@@ -10,7 +10,7 @@ use std::path::Path;
 
 pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     let primary_file = fs::canonicalize(path)?;
-
+    let base_path = primary_file.parent().unwrap_or(Path::new("."));
     let file_paths = file::locate_files(&primary_file)?;
 
     let mut packets = Vec::new();
@@ -47,35 +47,29 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
         packets.extend(parsed_packets);
     }
 
-    let potential_set = Par2ParsedSet::from_packets(packets)?;
-
-    let validated_set = potential_set.validate()?;
-
-    let creator = validated_set.creators.first().map(|c| c.name.clone());
-    let recoverable_files = validated_set.main.recovery_file_ids.len();
-    let other_files = validated_set.main.non_recovery_file_ids.len();
-    let block_size = validated_set.main.slice_size;
+    let parsed_set = Par2ParsedSet::from_packets(packets)?;
+    let validated_set = Par2Set::from_parsed(parsed_set)?;
+    let verified_set = Par2VerifiedSet::from_set(validated_set, base_path)?;
 
     info!("");
-    if let Some(name) = &creator {
+    if let Some(name) = &verified_set.creator {
         info!("Creator: {}", name.bold());
     }
 
-    if !validated_set.warnings.is_empty() {
+    if !verified_set.warnings.is_empty() {
         warn!("{}", "Warnings:".yellow());
-        for warning in &validated_set.warnings {
+        for warning in &verified_set.warnings {
             warn!("- {}", warning);
         }
     }
 
-    let base_path = primary_file.parent().unwrap_or(Path::new("."));
-
-    let verified_set = Par2VerifiedSet::new(validated_set, base_path)?;
-
-    info!("Recoverable files: {}", recoverable_files);
-    info!("Other files: {}", other_files);
+    info!(
+        "Recoverable files: {}",
+        verified_set.recovery_file_ids.len()
+    );
+    info!("Other files: {}", verified_set.non_recovery_file_ids.len());
     info!("Total size: {} bytes", verified_set.total_file_size);
-    debug!("Block size: {} bytes", block_size);
+    debug!("Block size: {} bytes", verified_set.slice_size);
     debug!("Data blocks: {}", verified_set.total_data_blocks);
 
     info!("");

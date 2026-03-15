@@ -1,4 +1,4 @@
-use crate::error::Par2Error;
+use crate::error::{Par2Error, Par2Warning};
 use crate::file;
 use crate::file_name::get_sanitized_file_path;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2RecoverySliceData};
@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub(crate) struct Par2VerifiedSet {
+    pub(crate) creator: Option<String>,
     pub(crate) non_recovery_file_ids: Vec<Par2FileId>,
     pub(crate) recovery_file_ids: Vec<Par2FileId>,
     pub(crate) recovery_slices: Vec<Par2RecoverySliceData>,
@@ -15,6 +16,7 @@ pub(crate) struct Par2VerifiedSet {
     pub(crate) slice_size: u64,
     pub(crate) total_data_blocks: usize,
     pub(crate) total_file_size: u64,
+    pub(crate) warnings: Vec<Par2Warning>,
 }
 
 #[derive(Debug)]
@@ -47,7 +49,7 @@ pub(crate) struct Par2FileVerificationResult {
 }
 
 impl Par2VerifiedSet {
-    pub(crate) fn new(set: Par2Set, base_path: &Path) -> Result<Self, Par2Error> {
+    pub(crate) fn from_set(set: Par2Set, base_path: &Path) -> Result<Self, Par2Error> {
         let mut results = Vec::new();
 
         let total_data_blocks = set.total_data_blocks();
@@ -137,7 +139,20 @@ impl Par2VerifiedSet {
             });
         }
 
+        let creator = if set.creators.is_empty() {
+            None
+        } else {
+            Some(
+                set.creators
+                    .iter()
+                    .map(|c| c.name.as_str())
+                    .collect::<Vec<_>>()
+                    .join("; "),
+            )
+        };
+
         Ok(Self {
+            creator,
             non_recovery_file_ids: set.main.non_recovery_file_ids,
             recovery_file_ids: set.main.recovery_file_ids,
             recovery_slices: set.recovery_slices,
@@ -145,6 +160,7 @@ impl Par2VerifiedSet {
             slice_size: set.main.slice_size,
             total_data_blocks,
             total_file_size,
+            warnings: set.warnings,
         })
     }
 

@@ -124,48 +124,50 @@ impl Par2ParsedSet {
             warnings,
         })
     }
+}
 
-    pub(crate) fn validate(self) -> Result<Par2Set, Par2Error> {
-        if self.main.computed_md5 != self.main.expected_md5
-            || self.main.recovery_set_id != self.main.data.recovery_set_id()
+impl Par2Set {
+    pub(crate) fn from_parsed(parsed: Par2ParsedSet) -> Result<Par2Set, Par2Error> {
+        if parsed.main.computed_md5 != parsed.main.expected_md5
+            || parsed.main.recovery_set_id != parsed.main.data.recovery_set_id()
         {
             return Err(Par2Error::MainPacketIntegrityFailure);
         }
 
-        if self.main.data.slice_size == 0 {
+        if parsed.main.data.slice_size == 0 {
             return Err(Par2Error::InvalidMainPacket(
                 "slice size is zero".to_string(),
             ));
         }
 
-        let mut warnings = self.warnings;
+        let mut warnings = parsed.warnings;
 
         let valid_file_descriptions = validate_and_filter(
             Par2WarningDataType::FileDescription,
-            self.file_descriptions,
-            self.recovery_set_id,
+            parsed.file_descriptions,
+            parsed.recovery_set_id,
             &mut warnings,
         );
 
         let valid_slice_checksums = validate_and_filter(
             Par2WarningDataType::SliceChecksum,
-            self.slice_checksums,
-            self.recovery_set_id,
+            parsed.slice_checksums,
+            parsed.recovery_set_id,
             &mut warnings,
         );
 
-        let had_recovery_slices = !self.recovery_slices.is_empty();
+        let had_recovery_slices = !parsed.recovery_slices.is_empty();
         let valid_recovery_slices = validate_and_filter(
             Par2WarningDataType::RecoverySlice,
-            self.recovery_slices,
-            self.recovery_set_id,
+            parsed.recovery_slices,
+            parsed.recovery_set_id,
             &mut warnings,
         );
 
         let valid_creators = validate_and_filter(
             Par2WarningDataType::Creator,
-            self.creators,
-            self.recovery_set_id,
+            parsed.creators,
+            parsed.recovery_set_id,
             &mut warnings,
         );
 
@@ -196,8 +198,8 @@ impl Par2ParsedSet {
         );
 
         Ok(Par2Set {
-            recovery_set_id: self.recovery_set_id,
-            main: self.main.data,
+            recovery_set_id: parsed.recovery_set_id,
+            main: parsed.main.data,
             file_descriptions,
             slice_checksums,
             recovery_slices: valid_recovery_slices,
@@ -205,9 +207,7 @@ impl Par2ParsedSet {
             warnings,
         })
     }
-}
 
-impl Par2Set {
     pub(crate) fn total_data_blocks(&self) -> usize {
         self.slice_checksums
             .values()
@@ -287,28 +287,29 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::packet::Par2PacketHeader;
+
+    fn make_packet(
+        body: Par2PacketBody,
+        packet_type: &[u8; 16],
+        recovery_set_id: Par2RecoverySetId,
+        md5: Par2Md5Hash,
+    ) -> Par2Packet {
+        Par2Packet {
+            header: Par2PacketHeader {
+                packet_length: 64,
+                expected_md5: Par2Md5Hash(md5.0),
+                computed_md5: Par2Md5Hash(md5.0),
+                recovery_set_id,
+                packet_type: *packet_type,
+            },
+            body,
+        }
+    }
 
     mod par2_parsed_set {
         use super::*;
         use crate::packet::Par2PacketHeader;
-
-        fn make_packet(
-            body: Par2PacketBody,
-            packet_type: &[u8; 16],
-            recovery_set_id: Par2RecoverySetId,
-            md5: Par2Md5Hash,
-        ) -> Par2Packet {
-            Par2Packet {
-                header: Par2PacketHeader {
-                    packet_length: 64,
-                    expected_md5: Par2Md5Hash(md5.0),
-                    computed_md5: Par2Md5Hash(md5.0),
-                    recovery_set_id,
-                    packet_type: *packet_type,
-                },
-                body,
-            }
-        }
 
         mod from_packets {
             use super::*;
@@ -527,8 +528,12 @@ mod tests {
                 assert!(matches!(set, Err(Par2Error::MainPacketConflict)));
             }
         }
+    }
 
-        mod validate {
+    mod par2_set {
+        use super::*;
+
+        mod from_parsed {
             use super::*;
             use crate::packet::{
                 PAR2_PACKET_MAGIC_CREATOR, PAR2_PACKET_MAGIC_FILE_DESC, PAR2_PACKET_MAGIC_MAIN,
@@ -595,7 +600,7 @@ mod tests {
             fn clean_set_validates() {
                 let set = valid_parsed_set();
 
-                let result = set.validate();
+                let result = Par2Set::from_parsed(set);
 
                 assert!(result.is_ok());
             }
@@ -607,7 +612,7 @@ mod tests {
                 // Corrupt the main packet's computed MD5 so it no longer matches expected
                 set.main.computed_md5 = Par2Md5Hash([0xFF; 16]);
 
-                let result = set.validate();
+                let result = Par2Set::from_parsed(set);
 
                 assert!(matches!(result, Err(Par2Error::MainPacketIntegrityFailure)));
             }
@@ -653,7 +658,7 @@ mod tests {
                 ];
                 let set = Par2ParsedSet::from_packets(packets).unwrap();
 
-                let result = set.validate();
+                let result = Par2Set::from_parsed(set);
 
                 assert!(matches!(result, Err(Par2Error::AllFileDescriptionsCorrupt)));
             }
@@ -699,7 +704,7 @@ mod tests {
                 ];
                 let set = Par2ParsedSet::from_packets(packets).unwrap();
 
-                let result = set.validate();
+                let result = Par2Set::from_parsed(set);
 
                 assert!(matches!(result, Err(Par2Error::AllSliceChecksumsCorrupt)));
             }
@@ -754,7 +759,7 @@ mod tests {
                 ];
                 let set = Par2ParsedSet::from_packets(packets).unwrap();
 
-                let validated = set.validate().unwrap();
+                let validated = Par2Set::from_parsed(set).unwrap();
 
                 assert!(
                     validated
