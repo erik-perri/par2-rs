@@ -7,6 +7,7 @@ mod packet;
 mod set;
 mod verify;
 
+use crate::error::Par2Error;
 use clap::{Parser, Subcommand};
 use colored::Colorize;
 use log::error;
@@ -78,7 +79,8 @@ fn main() {
 
     if let Err(e) = result {
         match e {
-            error::Par2Error::RepairRequired => process::exit(1),
+            Par2Error::RepairRequired => process::exit(1),
+            Par2Error::RepairNotPossible => process::exit(1),
             _ => {
                 error!("{}: {}", "Error".bold().red(), e);
                 process::exit(1);

@@ -1,4 +1,4 @@
-use crate::cli::load_and_verify;
+use crate::cli::{load_and_verify, plural};
 use crate::error::Par2Error;
 use crate::verify::{Par2VerificationSliceStatus, Par2VerificationStatus};
 use colored::Colorize;
@@ -8,7 +8,7 @@ use std::path::Path;
 pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
     let verified_set = load_and_verify(path)?;
 
-    info!("Verifying files:");
+    info!("Verifying files...");
 
     for result in &verified_set.results {
         let file_name = result.file_name.bold();
@@ -19,10 +19,10 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
                 slices,
             } => {
                 if computed_md5 == &result.expected_md5 {
-                    info!("- Target: {} - {}", file_name, "found".green());
+                    info!("- {} - {}", file_name, "found".green());
                 } else if slices.is_empty() {
                     info!(
-                        "- Target: {} - {} (no block checksums available)",
+                        "- {} - {} (no block checksums available)",
                         file_name,
                         "damaged".red()
                     );
@@ -33,20 +33,21 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
                         .count();
 
                     info!(
-                        "- Target: {} - {}. Found {} of {} data blocks",
+                        "- {} - {}. Found {} of {} data {}",
                         file_name,
                         "damaged".red(),
                         valid,
                         slices.len(),
+                        plural(valid, "block", "blocks"),
                     );
                 }
             }
             Par2VerificationStatus::NotFound => {
-                info!("- Target: {} - {}", file_name, "missing".red());
+                info!("- {} - {}", file_name, "missing".red());
             }
             Par2VerificationStatus::Unreadable { error } => {
                 info!(
-                    "- Target: {} - {} {}",
+                    "- {} - {} {}",
                     file_name,
                     "unreadable".red(),
                     error.to_string().dimmed()
@@ -66,22 +67,36 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
 
     let damaged = verified_set.damaged_count();
     if damaged > 0 {
-        info!("{} file(s) exist but are damaged.", damaged);
+        if damaged == 1 {
+            info!("1 file exists but is damaged.");
+        } else {
+            info!("{} files exist but are damaged.", damaged);
+        }
     }
 
     let missing = verified_set.missing_count();
     if missing > 0 {
-        info!("{} file(s) are missing.", missing);
+        if missing == 1 {
+            info!("1 file is missing.");
+        } else {
+            info!("{} files are missing.", damaged);
+        }
     }
 
     let available: usize = verified_set.available_blocks();
     info!(
-        "You have {} out of {} data blocks available.",
-        available, verified_set.total_data_blocks
+        "You have {} out of {} data {} available.",
+        available,
+        verified_set.total_data_blocks,
+        plural(available, "block", "blocks"),
     );
 
     let recovery = verified_set.recovery_slices.len();
-    info!("You have {} recovery blocks available.", recovery);
+    info!(
+        "You have {} recovery {} available.",
+        recovery,
+        plural(recovery, "block", "blocks"),
+    );
 
     let missing = verified_set.total_data_blocks - available;
 
@@ -90,9 +105,13 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
         if extra > 0 {
             info!(
                 "{}",
-                format!("Repair is possible, {} extra recovery blocks.", extra)
-                    .yellow()
-                    .bold()
+                format!(
+                    "Repair is possible, {} extra recovery {}.",
+                    extra,
+                    plural(extra, "block", "blocks"),
+                )
+                .yellow()
+                .bold()
             );
         } else {
             info!(
@@ -103,11 +122,13 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
             );
         }
     } else {
+        let needed = missing - recovery;
         info!(
             "{}",
             format!(
-                "You need {} more recovery blocks for repair.",
-                missing - recovery
+                "You need {} more recovery {} for repair.",
+                needed,
+                plural(needed, "block", "blocks"),
             )
             .red()
             .bold(),

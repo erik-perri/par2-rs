@@ -56,7 +56,9 @@ pub(crate) fn create(
     let common = build_common(slice_size, creator, file_data)?;
 
     info!("");
-    info!("Writing files:");
+
+    info!("Writing files...");
+
     for spec in &file_plan {
         info!("- {}", spec.file_name.bold());
     }

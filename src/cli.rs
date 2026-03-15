@@ -84,3 +84,11 @@ pub(super) fn load_and_verify(path: &Path) -> Result<Par2VerifiedSet, Par2Error>
 
     Ok(verified_set)
 }
+
+pub(super) fn plural(n: usize, singular: &str, plural: &str) -> String {
+    if n == 1 {
+        singular.to_string()
+    } else {
+        plural.to_string()
+    }
+}
