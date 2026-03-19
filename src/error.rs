@@ -1,3 +1,4 @@
+use crate::galois::GaloisError;
 use crate::packet::{Par2FileId, Par2Md5Hash, Par2PacketType, Par2RecoverySetId};
 
 #[derive(Debug)]
@@ -15,6 +16,7 @@ pub(crate) enum Par2Error {
     MissingMainPacket,
     MissingSliceChecksums,
     ParseError(String),
+    RepairError(String),
     RepairNotPossible,
     RepairRequired,
 }
@@ -22,6 +24,15 @@ pub(crate) enum Par2Error {
 impl From<std::io::Error> for Par2Error {
     fn from(err: std::io::Error) -> Self {
         Par2Error::Io(err)
+    }
+}
+
+impl From<GaloisError> for Par2Error {
+    fn from(err: GaloisError) -> Self {
+        Par2Error::RepairError(match err {
+            GaloisError::DivisionByZero => "division by zero".to_string(),
+            GaloisError::InverseOfZero => "inverse of zero".to_string(),
+        })
     }
 }
 
@@ -47,6 +58,7 @@ impl std::fmt::Display for Par2Error {
             Par2Error::MissingMainPacket => write!(f, "missing main packet"),
             Par2Error::MissingSliceChecksums => write!(f, "missing slice checksums"),
             Par2Error::ParseError(message) => write!(f, "{}", message),
+            Par2Error::RepairError(message) => write!(f, "repair failed: {}", message),
             Par2Error::RepairNotPossible => write!(f, "repair is not possible"),
             Par2Error::RepairRequired => write!(f, "repair is required"),
         }

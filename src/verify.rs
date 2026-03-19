@@ -8,6 +8,7 @@ use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
 pub(crate) struct Par2VerifiedSet {
+    pub(crate) base_path: PathBuf,
     pub(crate) creator: Option<String>,
     pub(crate) non_recovery_file_ids: Vec<Par2FileId>,
     pub(crate) recovery_file_ids: Vec<Par2FileId>,
@@ -19,7 +20,7 @@ pub(crate) struct Par2VerifiedSet {
     pub(crate) warnings: Vec<Par2Warning>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub(crate) enum Par2VerificationSliceStatus {
     Corrupt,
     Missing,
@@ -152,6 +153,7 @@ impl Par2VerifiedSet {
         };
 
         Ok(Self {
+            base_path: base_path.to_path_buf(),
             creator,
             non_recovery_file_ids: set.main.non_recovery_file_ids,
             recovery_file_ids: set.main.recovery_file_ids,

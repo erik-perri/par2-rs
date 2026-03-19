@@ -116,104 +116,198 @@ impl GaloisFieldCalculator {
     }
 }
 
+pub(crate) fn build_slice_constants(
+    calculator: &GaloisFieldCalculator,
+    slice_count: u16,
+) -> Vec<u16> {
+    let mut constants = Vec::new();
+
+    if slice_count < 1 {
+        return constants;
+    }
+
+    for candidate in 1..65535 {
+        if candidate % 3 == 0 || candidate % 5 == 0 || candidate % 17 == 0 || candidate % 257 == 0 {
+            continue;
+        }
+
+        constants.push(calculator.power(2, candidate));
+
+        if constants.len() >= slice_count as usize {
+            break;
+        }
+    }
+
+    constants
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn exp_table_unique() {
-        let gf = GaloisFieldCalculator::new();
-        let unique: std::collections::HashSet<u16> = gf.exp_table.iter().copied().collect();
+    mod galois_field_calculator {
+        use super::*;
 
-        assert_eq!(unique.len(), 65535);
-        assert!(!unique.contains(&0));
+        #[test]
+        fn exp_table_unique() {
+            let gf = GaloisFieldCalculator::new();
+            let unique: std::collections::HashSet<u16> = gf.exp_table.iter().copied().collect();
+
+            assert_eq!(unique.len(), 65535);
+            assert!(!unique.contains(&0));
+        }
+
+        #[test]
+        fn addition_and_subtraction() {
+            let gf = GaloisFieldCalculator::new();
+            let a = 0x1234;
+            let b = 0x5678;
+
+            assert_eq!(gf.add(a, 0), a);
+            assert_eq!(gf.subtract(a, 0), a);
+
+            assert_eq!(gf.add(a, a), 0);
+            assert_eq!(gf.subtract(a, a), 0);
+
+            assert_eq!(gf.add(a, b), gf.subtract(a, b));
+
+            assert_eq!(gf.add(a, b), gf.add(b, a));
+            assert_eq!(gf.subtract(a, b), gf.subtract(b, a));
+        }
+
+        #[test]
+        fn multiplication() {
+            let gf = GaloisFieldCalculator::new();
+            let a = 0x1234;
+            let b = 0x5678;
+            let c = 0x9ABC;
+
+            assert_eq!(gf.multiply(a, 0), 0);
+            assert_eq!(gf.multiply(0, a), 0);
+
+            assert_eq!(gf.multiply(a, 1), a);
+            assert_eq!(gf.multiply(1, a), a);
+
+            assert_eq!(gf.multiply(a, b), gf.multiply(b, a));
+
+            let ab = gf.multiply(a, b);
+            let bc = gf.multiply(b, c);
+            assert_eq!(gf.multiply(ab, c), gf.multiply(a, bc));
+
+            let b_plus_c = gf.add(b, c);
+            let ab_plus_ac = gf.add(gf.multiply(a, b), gf.multiply(a, c));
+            assert_eq!(gf.multiply(a, b_plus_c), ab_plus_ac);
+        }
+
+        #[test]
+        fn division() {
+            let gf = GaloisFieldCalculator::new();
+            let a = 0x1234;
+            let b = 0x5678;
+
+            assert_eq!(gf.divide(a, 1).unwrap(), a);
+            assert_eq!(gf.divide(a, a).unwrap(), 1);
+            assert_eq!(gf.divide(0, a).unwrap(), 0);
+
+            assert!(matches!(gf.divide(a, 0), Err(GaloisError::DivisionByZero)));
+
+            let ab = gf.multiply(a, b);
+            assert_eq!(gf.divide(ab, b).unwrap(), a);
+            assert_eq!(gf.divide(ab, a).unwrap(), b);
+        }
+
+        #[test]
+        fn inverse() {
+            let gf = GaloisFieldCalculator::new();
+            let a = 0x1234;
+
+            assert_eq!(gf.inverse(1).unwrap(), 1);
+
+            assert_eq!(gf.multiply(a, gf.inverse(a).unwrap()), 1);
+
+            assert!(matches!(gf.inverse(0), Err(GaloisError::InverseOfZero)));
+        }
+
+        #[test]
+        fn power() {
+            let gf = GaloisFieldCalculator::new();
+            let a = 0x1234;
+
+            assert_eq!(gf.power(a, 0), 1);
+            assert_eq!(gf.power(a, 1), a);
+            assert_eq!(gf.power(a, 2), gf.multiply(a, a));
+
+            let a2 = gf.power(a, 2);
+            let a3 = gf.power(a, 3);
+            let a5 = gf.power(a, 5);
+            assert_eq!(gf.multiply(a2, a3), a5);
+
+            assert_eq!(gf.power(a, 65535), 1);
+        }
     }
 
-    #[test]
-    fn addition_and_subtraction() {
-        let gf = GaloisFieldCalculator::new();
-        let a = 0x1234;
-        let b = 0x5678;
+    mod build_slice_constants {
+        use super::*;
 
-        assert_eq!(gf.add(a, 0), a);
-        assert_eq!(gf.subtract(a, 0), a);
+        #[test]
+        fn first_constant_uses_exponent_1() {
+            // Exponent 1 is the first valid exponent (not divisible by 3, 5, 17, or 257).
+            // So the first constant should be power(2, 1) = 2.
+            let gf = GaloisFieldCalculator::new();
+            let constants = build_slice_constants(&gf, 1);
 
-        assert_eq!(gf.add(a, a), 0);
-        assert_eq!(gf.subtract(a, a), 0);
+            assert_eq!(constants.len(), 1);
+            assert_eq!(constants[0], 2);
+        }
 
-        assert_eq!(gf.add(a, b), gf.subtract(a, b));
+        #[test]
+        fn skips_exponent_3() {
+            // Exponent 3 is divisible by 3, so it should be skipped.
+            // That means power(2, 3) = 8 should NOT appear as the third constant.
+            // Instead, the third constant should use exponent 4: power(2, 4) = 16
+            let gf = GaloisFieldCalculator::new();
+            let constants = build_slice_constants(&gf, 3);
 
-        assert_eq!(gf.add(a, b), gf.add(b, a));
-        assert_eq!(gf.subtract(a, b), gf.subtract(b, a));
-    }
+            assert_eq!(constants.len(), 3);
+            assert_eq!(constants[2], 16); // exponent 4, not 3
+        }
 
-    #[test]
-    fn multiplication() {
-        let gf = GaloisFieldCalculator::new();
-        let a = 0x1234;
-        let b = 0x5678;
-        let c = 0x9ABC;
+        #[test]
+        fn skips_exponent_5() {
+            // Exponent 5 is divisible by 5, so power(2, 5) = 32 should not appear
+            let gf = GaloisFieldCalculator::new();
+            let constants = build_slice_constants(&gf, 6);
 
-        assert_eq!(gf.multiply(a, 0), 0);
-        assert_eq!(gf.multiply(0, a), 0);
+            assert_eq!(constants.len(), 6);
+            assert!(!constants.contains(&gf.power(2, 5)));
+        }
 
-        assert_eq!(gf.multiply(a, 1), a);
-        assert_eq!(gf.multiply(1, a), a);
+        #[test]
+        fn skips_exponent_17() {
+            let gf = GaloisFieldCalculator::new();
+            // Need enough constants to get past exponent 17
+            let constants = build_slice_constants(&gf, 12);
 
-        assert_eq!(gf.multiply(a, b), gf.multiply(b, a));
+            assert_eq!(constants.len(), 12);
+            assert!(!constants.contains(&gf.power(2, 17)));
+        }
 
-        let ab = gf.multiply(a, b);
-        let bc = gf.multiply(b, c);
-        assert_eq!(gf.multiply(ab, c), gf.multiply(a, bc));
+        #[test]
+        fn skips_exponent_257() {
+            let gf = GaloisFieldCalculator::new();
+            // Need enough constants to get past exponent 257
+            let constants = build_slice_constants(&gf, 200);
 
-        let b_plus_c = gf.add(b, c);
-        let ab_plus_ac = gf.add(gf.multiply(a, b), gf.multiply(a, c));
-        assert_eq!(gf.multiply(a, b_plus_c), ab_plus_ac);
-    }
+            assert_eq!(constants.len(), 200);
+            assert!(!constants.contains(&gf.power(2, 257)));
+        }
 
-    #[test]
-    fn division() {
-        let gf = GaloisFieldCalculator::new();
-        let a = 0x1234;
-        let b = 0x5678;
+        #[test]
+        fn returns_empty_for_zero() {
+            let gf = GaloisFieldCalculator::new();
+            let constants = build_slice_constants(&gf, 0);
 
-        assert_eq!(gf.divide(a, 1).unwrap(), a);
-        assert_eq!(gf.divide(a, a).unwrap(), 1);
-        assert_eq!(gf.divide(0, a).unwrap(), 0);
-
-        assert!(matches!(gf.divide(a, 0), Err(GaloisError::DivisionByZero)));
-
-        let ab = gf.multiply(a, b);
-        assert_eq!(gf.divide(ab, b).unwrap(), a);
-        assert_eq!(gf.divide(ab, a).unwrap(), b);
-    }
-
-    #[test]
-    fn inverse() {
-        let gf = GaloisFieldCalculator::new();
-        let a = 0x1234;
-
-        assert_eq!(gf.inverse(1).unwrap(), 1);
-
-        assert_eq!(gf.multiply(a, gf.inverse(a).unwrap()), 1);
-
-        assert!(matches!(gf.inverse(0), Err(GaloisError::InverseOfZero)));
-    }
-
-    #[test]
-    fn power() {
-        let gf = GaloisFieldCalculator::new();
-        let a = 0x1234;
-
-        assert_eq!(gf.power(a, 0), 1);
-        assert_eq!(gf.power(a, 1), a);
-        assert_eq!(gf.power(a, 2), gf.multiply(a, a));
-
-        let a2 = gf.power(a, 2);
-        let a3 = gf.power(a, 3);
-        let a5 = gf.power(a, 5);
-        assert_eq!(gf.multiply(a2, a3), a5);
-
-        assert_eq!(gf.power(a, 65535), 1);
+            assert!(constants.is_empty());
+        }
     }
 }

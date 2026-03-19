@@ -1,7 +1,7 @@
 use crate::error::Par2Error;
 use crate::file::{Par2ComputedFileData, compute_file_data};
 use crate::file_name::plan_recovery_files;
-use crate::galois::GaloisFieldCalculator;
+use crate::galois::{GaloisFieldCalculator, build_slice_constants};
 use crate::packet::{
     Par2CreatorData, Par2FileDescriptionData, Par2MainData, Par2PacketBody, Par2PacketHeader,
     Par2RecoverySetId, Par2RecoverySliceData, Par2SliceChecksumData,
@@ -75,6 +75,7 @@ pub(crate) fn create(
 
         let mut recovery_slices: Vec<Par2RecoverySliceData> = Vec::new();
         let mut block_number = 0u16;
+        let slice_constants = build_slice_constants(&calculator, total_input_slices as u16);
 
         for exponent in spec.starting_exponent..(spec.starting_exponent + spec.block_count) {
             block_number += 1;
@@ -96,8 +97,7 @@ pub(crate) fn create(
                         Ok(0) => break,
                         Ok(_n) => {
                             let mut cursor = Cursor::new(&input_buffer);
-                            let slice_constant =
-                                find_slice_constant(&calculator, global_slice_index);
+                            let slice_constant = slice_constants[global_slice_index];
                             let slice_coefficient = calculator.power(slice_constant, exponent);
 
                             for slice_index in 0..slice_size as usize / 2 {
@@ -147,20 +147,6 @@ pub(crate) fn create(
     info!("{}", "Done".green().bold());
 
     Ok(())
-}
-
-fn find_slice_constant(calculator: &GaloisFieldCalculator, slice_number: u16) -> u16 {
-    let mut slice_numbers = Vec::new();
-
-    for i in 1..65534 {
-        if i % 3 == 0 || i % 5 == 0 || i % 17 == 0 || i % 257 == 0 {
-            continue;
-        }
-
-        slice_numbers.push(i);
-    }
-
-    calculator.power(2, slice_numbers[slice_number as usize])
 }
 
 struct CommonFileData {

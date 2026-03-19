@@ -2,7 +2,7 @@ use crate::error::Par2Error;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::{Cursor, Read, Write};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Par2RecoverySliceData {
     pub(crate) exponent: u32,
     pub(crate) recovery_data: Vec<u8>,
