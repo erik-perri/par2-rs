@@ -6,16 +6,12 @@ use crate::verify::{
     Par2FileVerificationResult, Par2VerificationSliceStatus, Par2VerificationStatus,
     Par2VerifiedSet,
 };
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use colored::Colorize;
 use log::{info, trace};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Cursor, Read, Seek, SeekFrom};
-use std::ops::Mul;
-use std::path::{Path, PathBuf};
-use std::process::abort;
-use tempfile::NamedTempFile;
+use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::path::Path;
 
 pub(crate) fn repair(path: &Path) -> Result<(), Par2Error> {
     let verified_set = load_and_verify(path)?;
@@ -183,7 +179,7 @@ impl<'a> RepairJob<'a> {
         for row in 0..k {
             let exponent = self.recovery_buffers[row].exponent as u16;
             for col in 0..k {
-                let constant = self.slices[self.missing_indexes[col as usize] as usize].gf_constant;
+                let constant = self.slices[self.missing_indexes[col] as usize].gf_constant;
 
                 matrix[row][col] = self.calculator.power(constant, exponent);
             }
