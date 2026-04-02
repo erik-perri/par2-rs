@@ -21,18 +21,6 @@ pub(crate) fn repair(path: &Path) -> Result<(), Par2Error> {
         return Ok(());
     }
 
-    for result in &verified_set.results {
-        if matches!(result.status, Par2VerificationStatus::Unreadable { .. }) {
-            info!(
-                "File {} is unreadable, unable to repair.",
-                result.file_path.display().to_string().bold()
-            );
-
-            info!("{}", "Repair not possible.".red().bold());
-            return Err(Par2Error::RepairRequired);
-        }
-    }
-
     let recovery_block_count = verified_set.recovery_slices.len();
     let missing_block_count = verified_set.total_data_blocks - verified_set.available_blocks();
 
@@ -351,7 +339,7 @@ fn build_slices(
                 }
                 continue;
             }
-            Par2VerificationStatus::NotFound => {
+            Par2VerificationStatus::NotFound | Par2VerificationStatus::Unreadable { .. } => {
                 let file_slice_count = result.file_length.div_ceil(slice_size);
 
                 for local_slice_index in 0..file_slice_count {
@@ -365,10 +353,6 @@ fn build_slices(
 
                     global_slice_index += 1;
                 }
-                continue;
-            }
-            Par2VerificationStatus::Unreadable { .. } => {
-                // TODO ?
                 continue;
             }
         }
