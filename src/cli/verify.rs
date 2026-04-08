@@ -79,7 +79,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
         if missing == 1 {
             info!("1 file is missing.");
         } else {
-            info!("{} files are missing.", damaged);
+            info!("{} files are missing.", missing);
         }
     }
 
