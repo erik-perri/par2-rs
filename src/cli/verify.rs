@@ -100,7 +100,7 @@ pub(crate) fn verify(path: &Path) -> Result<(), Par2Error> {
 
     let missing = verified_set.total_data_blocks - available;
 
-    if recovery > missing {
+    if recovery >= missing {
         let extra = recovery - missing;
         if extra > 0 {
             info!(
