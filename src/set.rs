@@ -233,20 +233,20 @@ fn validate_and_filter<T>(
 
     for parsed_data in data {
         if parsed_data.recovery_set_id != recovery_set_id {
-            warnings.push(Par2Warning::UnexpectedRecoverySetId(
+            warnings.push(Par2Warning::UnexpectedRecoverySetId {
+                computed: recovery_set_id,
                 data_type,
-                recovery_set_id,
-                parsed_data.recovery_set_id,
-            ));
+                expected: parsed_data.recovery_set_id,
+            });
             continue;
         }
 
         if parsed_data.computed_md5 != parsed_data.expected_md5 {
-            warnings.push(Par2Warning::IntegrityFailure(
+            warnings.push(Par2Warning::IntegrityFailure {
+                computed: parsed_data.computed_md5,
                 data_type,
-                parsed_data.computed_md5,
-                parsed_data.expected_md5,
-            ));
+                expected: parsed_data.expected_md5,
+            });
             continue;
         }
         valid_data.push(parsed_data.data);
@@ -815,7 +815,7 @@ mod tests {
             assert_eq!(warnings.len(), 1);
             assert!(matches!(
                 warnings[0],
-                Par2Warning::UnexpectedRecoverySetId(..)
+                Par2Warning::UnexpectedRecoverySetId { .. }
             ));
         }
 
@@ -845,7 +845,7 @@ mod tests {
             assert_eq!(filtered_data.len(), 0);
 
             assert_eq!(warnings.len(), 1);
-            assert!(matches!(warnings[0], Par2Warning::IntegrityFailure(..)));
+            assert!(matches!(warnings[0], Par2Warning::IntegrityFailure { .. }));
         }
     }
 }

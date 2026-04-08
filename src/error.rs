@@ -87,10 +87,18 @@ impl std::fmt::Display for Par2WarningDataType {
 #[derive(Debug)]
 pub(crate) enum Par2Warning {
     AllRecoverySlicesCorrupt,
-    IntegrityFailure(Par2WarningDataType, Par2Md5Hash, Par2Md5Hash),
+    IntegrityFailure {
+        computed: Par2Md5Hash,
+        data_type: Par2WarningDataType,
+        expected: Par2Md5Hash,
+    },
     MissingCreator,
     UnexpectedFileDescription(Par2FileId),
-    UnexpectedRecoverySetId(Par2WarningDataType, Par2RecoverySetId, Par2RecoverySetId),
+    UnexpectedRecoverySetId {
+        computed: Par2RecoverySetId,
+        data_type: Par2WarningDataType,
+        expected: Par2RecoverySetId,
+    },
     UnexpectedSliceData(Par2FileId),
     UnknownPacketType(Par2PacketType),
 }
@@ -99,23 +107,31 @@ impl std::fmt::Display for Par2Warning {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Par2Warning::AllRecoverySlicesCorrupt => write!(f, "all recovery slices are corrupt"),
-            Par2Warning::IntegrityFailure(data_type, expected, actual) => {
+            Par2Warning::IntegrityFailure {
+                computed,
+                data_type,
+                expected,
+            } => {
                 write!(
                     f,
                     "integrity failure for {}: expected {}, got {}",
                     data_type,
                     hex::encode(expected),
-                    hex::encode(actual)
+                    hex::encode(computed)
                 )
             }
             Par2Warning::MissingCreator => write!(f, "missing creator"),
-            Par2Warning::UnexpectedRecoverySetId(data_type, expected, actual) => {
+            Par2Warning::UnexpectedRecoverySetId {
+                computed,
+                data_type,
+                expected,
+            } => {
                 write!(
                     f,
                     "mismatched recovery set id for {}: expected {}, got {}",
                     data_type,
                     hex::encode(expected),
-                    hex::encode(actual)
+                    hex::encode(computed)
                 )
             }
             Par2Warning::UnexpectedFileDescription(file_id) => {
