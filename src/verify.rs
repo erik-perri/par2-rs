@@ -94,7 +94,7 @@ impl Par2VerifiedSet {
                     results.push(Par2FileVerificationResult {
                         expected_md5: file_description.file_md5,
                         file_id,
-                        file_length: computed_checksums.file_length,
+                        file_length: file_description.file_length,
                         file_name,
                         file_path: file_path.clone(),
                         status: Par2VerificationStatus::Found {
@@ -130,7 +130,7 @@ impl Par2VerifiedSet {
             results.push(Par2FileVerificationResult {
                 expected_md5: file_description.file_md5,
                 file_id,
-                file_length: computed_checksums.file_length,
+                file_length: file_description.file_length,
                 file_name,
                 file_path: file_path.clone(),
                 status: Par2VerificationStatus::Found {
