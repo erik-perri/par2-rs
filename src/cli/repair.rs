@@ -7,11 +7,11 @@ use crate::verify::{
     Par2VerifiedSet,
 };
 use colored::Colorize;
-use log::{info, trace};
+use log::{debug, info, trace};
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
 
 pub(crate) fn repair(path: &Path) -> Result<(), Par2Error> {
     let verified_set = load_and_verify(path)?;
@@ -36,27 +36,53 @@ pub(crate) fn repair(path: &Path) -> Result<(), Par2Error> {
         return Err(Par2Error::RepairNotPossible);
     }
 
-    info!("Starting repair...");
+    if missing_block_count > 0 {
+        info!(
+            "Repairing {} missing {} using {} recovery {}.",
+            missing_block_count,
+            plural(missing_block_count, "block", "blocks"),
+            recovery_block_count,
+            plural(recovery_block_count, "block", "blocks"),
+        );
+    } else {
+        info!("Repairing damaged files...");
+    }
+
+    info!("");
 
     trace!("{:#?}", verified_set);
 
     let mut job = RepairJob::new(&verified_set);
 
-    job.subtract_known_contributions()?;
-    job.solve()?;
-    job.write_recovered_files()?;
+    job.run()?;
 
-    todo!()
+    info!("");
+    info!("{}", "Repair complete.".green().bold());
+
+    Ok(())
 }
 
 struct RepairJob<'a> {
     calculator: GaloisFieldCalculator,
-    missing_indexes: Vec<u64>,
+    missing_indexes: Vec<usize>,
     recovery_buffers: Vec<Par2RecoverySliceData>,
     result_map: HashMap<Par2FileId, &'a Par2FileVerificationResult>,
     slices: Vec<SliceData>,
-    valid_indexes: Vec<u64>,
+    valid_indexes: Vec<usize>,
     verified_set: &'a Par2VerifiedSet,
+}
+
+#[derive(Debug)]
+enum SliceSource {
+    Original { local_slice_index: usize },
+    Recovered { recovery_buffer_index: usize },
+}
+
+#[derive(Debug)]
+struct RepairPlan {
+    file_path: PathBuf,
+    file_length: u64,
+    slices: Vec<SliceSource>,
 }
 
 impl<'a> RepairJob<'a> {
@@ -114,10 +140,90 @@ impl<'a> RepairJob<'a> {
         }
     }
 
-    pub(crate) fn subtract_known_contributions(&mut self) -> Result<(), Par2Error> {
-        for valid_index in &self.valid_indexes {
+    pub(crate) fn run(&mut self) -> Result<(), Par2Error> {
+        self.subtract_known_contributions()?;
+        self.solve()?;
+        let plan = self.plan()?;
+
+        trace!("Plan {:#?}", plan);
+
+        self.write_recovered_files(plan)?;
+
+        Ok(())
+    }
+
+    fn plan(&mut self) -> Result<Vec<RepairPlan>, Par2Error> {
+        let mut plan = Vec::new();
+
+        for file_id in &self.verified_set.recovery_file_ids {
+            let result = self.result_map.get(file_id).ok_or_else(|| {
+                Par2Error::FilePathError("unable to find file description".into())
+            })?;
+
+            if let Par2VerificationStatus::Found { computed_md5, .. } = &result.status {
+                if result.expected_md5 == *computed_md5 {
+                    continue;
+                }
+            }
+
+            let mut slices = Vec::new();
+
+            for global_slice_index in
+                result.global_slice_start..result.global_slice_start + result.slice_count
+            {
+                let slice_result = self
+                    .slices
+                    .get(global_slice_index)
+                    .ok_or_else(|| Par2Error::RepairError("unable to find slice result".into()))?;
+
+                match slice_result.status {
+                    Par2VerificationSliceStatus::Valid => slices.push(SliceSource::Original {
+                        local_slice_index: global_slice_index - result.global_slice_start,
+                    }),
+                    Par2VerificationSliceStatus::Missing | Par2VerificationSliceStatus::Corrupt => {
+                        let recovery_buffer_index = self
+                            .missing_indexes
+                            .iter()
+                            .position(|&index| index == global_slice_index)
+                            .ok_or_else(|| {
+                                Par2Error::RepairError("unable to find recovery index".into())
+                            })?;
+
+                        slices.push(SliceSource::Recovered {
+                            recovery_buffer_index,
+                        })
+                    }
+                }
+            }
+
+            plan.push(RepairPlan {
+                file_length: result.file_length,
+                file_path: result.file_path.clone(),
+                slices,
+            })
+        }
+
+        Ok(plan)
+    }
+
+    fn subtract_known_contributions(&mut self) -> Result<(), Par2Error> {
+        info!("Subtracting known data contributions...");
+
+        for (i, valid_index) in self.valid_indexes.iter().enumerate() {
             let slice = &self.slices[*valid_index as usize];
             let file_result = &self.result_map[&slice.file_id];
+
+            debug!(
+                "Processing data block {} of {} from {}",
+                i + 1,
+                self.valid_indexes.len(),
+                file_result
+                    .file_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .bold(),
+            );
 
             trace!(
                 "Reading slice {} from {}",
@@ -160,7 +266,9 @@ impl<'a> RepairJob<'a> {
         Ok(())
     }
 
-    pub(crate) fn solve(&mut self) -> Result<(), Par2Error> {
+    fn solve(&mut self) -> Result<(), Par2Error> {
+        info!("Computing repair data...");
+
         let k = self.missing_indexes.len();
         let mut matrix = vec![vec![0u16; k]; k];
 
@@ -255,33 +363,65 @@ impl<'a> RepairJob<'a> {
         Ok(())
     }
 
-    pub(crate) fn write_recovered_files(&self) -> Result<(), Par2Error> {
-        for result in &self.verified_set.results {
-            match &result.status {
-                Par2VerificationStatus::Unreadable { error } => {
-                    // fail(?)
-                }
-                Par2VerificationStatus::NotFound => {
-                    // write all repaired slices
-                }
-                Par2VerificationStatus::Found { slices, .. } => {
-                    // write valid slices mixed with repaired slices
+    fn write_recovered_files(&self, plan: Vec<RepairPlan>) -> Result<(), Par2Error> {
+        info!("Writing repaired files...");
+
+        for file_plan in plan {
+            info!(
+                "- Writing {}",
+                file_plan
+                    .file_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .bold(),
+            );
+
+            let temp_path = get_temp_path(&file_plan.file_path)?;
+            let mut file = File::create(&temp_path)?;
+
+            for slice in file_plan.slices {
+                match slice {
+                    SliceSource::Original { local_slice_index } => {
+                        let bytes = read_slice_from_disk(
+                            &file_plan.file_path,
+                            local_slice_index,
+                            self.verified_set.slice_size,
+                        )?;
+
+                        file.write_all(&bytes)?;
+                    }
+                    SliceSource::Recovered {
+                        recovery_buffer_index,
+                    } => {
+                        let recovery_result = self
+                            .recovery_buffers
+                            .get(recovery_buffer_index)
+                            .ok_or_else(|| {
+                                Par2Error::RepairError("unable to find recovery data".into())
+                            })?;
+
+                        file.write_all(&recovery_result.recovery_data)?;
+                    }
                 }
             }
+
+            file.set_len(file_plan.file_length)?;
+            std::fs::rename(&temp_path, &file_plan.file_path)?
         }
 
-        todo!()
+        Ok(())
     }
 }
 
 fn read_slice_from_disk(
     file_path: &Path,
-    slice_index: u64,
+    slice_index: usize,
     slice_size: u64,
 ) -> Result<Vec<u8>, Par2Error> {
     let file = File::open(file_path)?;
 
-    let start_position = slice_size * slice_index;
+    let start_position = slice_size * slice_index as u64;
     let mut slice_buffer = vec![0u8; slice_size as usize];
     let mut reader = BufReader::new(file);
 
@@ -302,8 +442,8 @@ fn read_slice_from_disk(
 struct SliceData {
     file_id: Par2FileId,
     gf_constant: u16,
-    global_slice_index: u64,
-    local_slice_index: u64,
+    global_slice_index: usize,
+    local_slice_index: usize,
     status: Par2VerificationSliceStatus,
 }
 
@@ -340,7 +480,7 @@ fn build_slices(
                 continue;
             }
             Par2VerificationStatus::NotFound | Par2VerificationStatus::Unreadable { .. } => {
-                let file_slice_count = result.file_length.div_ceil(slice_size);
+                let file_slice_count = result.file_length.div_ceil(slice_size) as usize;
 
                 for local_slice_index in 0..file_slice_count {
                     slice_map.push(SliceData {
@@ -359,4 +499,25 @@ fn build_slices(
     }
 
     slice_map
+}
+
+fn get_temp_path(file_path: &PathBuf) -> Result<PathBuf, Par2Error> {
+    let file_name = file_path
+        .file_name()
+        .ok_or_else(|| Par2Error::FilePathError("unable to determine file name".into()))?;
+    let parent_path = file_path
+        .parent()
+        .ok_or_else(|| Par2Error::FilePathError("file path is missing parent".into()))?;
+
+    for i in 1..10 {
+        let potentially_unique_path = parent_path.join(format!("{}.{}", file_name.display(), i));
+
+        if !potentially_unique_path.exists() {
+            return Ok(potentially_unique_path);
+        }
+    }
+
+    Err(Par2Error::FilePathError(
+        "Unable to create output file".to_string(),
+    ))
 }
