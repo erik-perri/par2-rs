@@ -46,6 +46,8 @@ pub(crate) struct Par2FileVerificationResult {
     pub(crate) file_length: u64,
     pub(crate) file_name: String,
     pub(crate) file_path: PathBuf,
+    pub(crate) global_slice_start: usize,
+    pub(crate) slice_count: usize,
     pub(crate) status: Par2VerificationStatus,
 }
 
@@ -53,20 +55,31 @@ impl Par2VerifiedSet {
     pub(crate) fn from_set(set: Par2Set, base_path: &Path) -> Result<Self, Par2Error> {
         let mut results = Vec::new();
 
+        let mut global_slice_index: usize = 0;
         let total_data_blocks = set.total_data_blocks();
         let total_file_size = set.total_file_size();
 
-        for (file_id, file_description) in set.file_descriptions.into_iter() {
+        for file_id in &set.main.recovery_file_ids {
+            let file_description = set.file_descriptions.get(file_id).ok_or_else(|| {
+                Par2Error::FilePathError("unable to find file description".into())
+            })?;
             let file_path = get_sanitized_file_path(base_path, &file_description.file_name)?;
             let file_name = file_path.file_name().unwrap().to_string_lossy().to_string();
+
+            let global_slice_start = global_slice_index;
+            let file_slices = file_description.file_length.div_ceil(set.main.slice_size) as usize;
+
+            global_slice_index += file_slices;
 
             if !file_path.is_file() {
                 results.push(Par2FileVerificationResult {
                     expected_md5: file_description.file_md5,
-                    file_id,
+                    file_id: file_id.clone(),
                     file_length: file_description.file_length,
                     file_name,
                     file_path,
+                    global_slice_start,
+                    slice_count: file_slices,
                     status: Par2VerificationStatus::NotFound,
                 });
                 continue;
@@ -78,10 +91,12 @@ impl Par2VerifiedSet {
                 Err(error) => {
                     results.push(Par2FileVerificationResult {
                         expected_md5: file_description.file_md5,
-                        file_id,
+                        file_id: file_id.clone(),
                         file_length: file_description.file_length,
                         file_name,
                         file_path,
+                        global_slice_start,
+                        slice_count: file_slices,
                         status: Par2VerificationStatus::Unreadable { error },
                     });
                     continue;
@@ -93,10 +108,12 @@ impl Par2VerifiedSet {
                 None => {
                     results.push(Par2FileVerificationResult {
                         expected_md5: file_description.file_md5,
-                        file_id,
+                        file_id: file_id.clone(),
                         file_length: file_description.file_length,
                         file_name,
                         file_path: file_path.clone(),
+                        global_slice_start,
+                        slice_count: file_slices,
                         status: Par2VerificationStatus::Found {
                             computed_md5: computed_checksums.file_md5,
                             slices: vec![],
@@ -129,10 +146,12 @@ impl Par2VerifiedSet {
 
             results.push(Par2FileVerificationResult {
                 expected_md5: file_description.file_md5,
-                file_id,
+                file_id: file_id.clone(),
                 file_length: file_description.file_length,
                 file_name,
                 file_path: file_path.clone(),
+                global_slice_start,
+                slice_count: file_slices,
                 status: Par2VerificationStatus::Found {
                     computed_md5: computed_checksums.file_md5,
                     slices: slice_statuses,
