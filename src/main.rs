@@ -28,7 +28,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Create {
-        #[arg(short = 's', long, default_value = "16")]
+        #[arg(short = 's', long, default_value = "16", value_parser = parse_block_size)]
         block_size: u64,
         #[arg(short = 'c', long, default_value = "2")]
         recovery_block_count: u16,
@@ -93,4 +93,18 @@ fn main() {
 
 fn format_level(verbose: u8) -> bool {
     verbose > 0
+}
+
+fn parse_block_size(s: &str) -> Result<u64, String> {
+    let val: u64 = s.parse().map_err(|e| format!("{e}"))?;
+
+    if val == 0 {
+        return Err("block size must be nonzero".into());
+    }
+
+    if !val.is_multiple_of(4) {
+        return Err("block size must be multiple of 4".into());
+    }
+
+    Ok(val)
 }

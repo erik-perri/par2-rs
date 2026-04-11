@@ -21,6 +21,12 @@ pub(crate) fn create(
     input_files: &[PathBuf],
     creator: &str,
 ) -> Result<(), Par2Error> {
+    if !slice_size.is_multiple_of(4) {
+        return Err(Par2Error::CreateError(
+            "slice size must be multiple of 4".into(),
+        ));
+    }
+
     let parent = base_output_file.parent().unwrap_or(Path::new("."));
     let file_plan = plan_recovery_files(base_output_file, recovery_block_count)?;
 
