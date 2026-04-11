@@ -93,23 +93,34 @@ pub(crate) fn create(
                 loop {
                     input_buffer.fill(0);
 
-                    match input_file.read(&mut input_buffer) {
-                        Ok(0) => break,
-                        Ok(_n) => {
-                            let mut cursor = Cursor::new(&input_buffer);
-                            let slice_constant = slice_constants[global_slice_index];
-                            let slice_coefficient = calculator.power(slice_constant, exponent);
-
-                            for slice_index in 0..slice_size as usize / 2 {
-                                let word = cursor.read_u16::<LittleEndian>()?;
-
-                                recovery_buffer[slice_index] ^=
-                                    calculator.multiply(slice_coefficient, word);
-                            }
-
-                            global_slice_index += 1;
+                    let mut bytes_read = 0;
+                    while bytes_read < input_buffer.len() {
+                        match input_file.read(&mut input_buffer[bytes_read..])? {
+                            0 => break,
+                            current_read => bytes_read += current_read,
                         }
-                        Err(e) => return Err(e.into()),
+                    }
+
+                    if bytes_read == 0 {
+                        break;
+                    }
+
+                    let mut cursor = Cursor::new(&input_buffer);
+                    let slice_constant = slice_constants[global_slice_index];
+                    let slice_coefficient = calculator.power(slice_constant, exponent);
+
+                    for slice_index in 0..slice_size as usize / 2 {
+                        let word = cursor.read_u16::<LittleEndian>()?;
+
+                        recovery_buffer[slice_index] ^=
+                            calculator.multiply(slice_coefficient, word);
+                    }
+
+                    global_slice_index += 1;
+
+                    // If we didn't read a full slice, we're at the end of the file.
+                    if bytes_read < input_buffer.len() {
+                        break;
                     }
                 }
             }
