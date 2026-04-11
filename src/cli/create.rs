@@ -49,6 +49,9 @@ pub(crate) fn create(
         .map(|d| d.computed_slice_checksums.len())
         .sum();
 
+    let total_input_slices: u16 = u16::try_from(total_input_slices)
+        .map_err(|_| Par2Error::CreateError("too many slices (max 65535)".into()))?;
+
     let source_file_count = file_data.len();
     let recovery_file_count = file_plan.iter().filter(|s| s.block_count > 0).count();
 
@@ -81,7 +84,7 @@ pub(crate) fn create(
 
         let mut recovery_slices: Vec<Par2RecoverySliceData> = Vec::new();
         let mut block_number = 0u16;
-        let slice_constants = build_slice_constants(&calculator, total_input_slices as u16);
+        let slice_constants = build_slice_constants(&calculator, total_input_slices);
 
         for exponent in spec.starting_exponent..(spec.starting_exponent + spec.block_count) {
             block_number += 1;

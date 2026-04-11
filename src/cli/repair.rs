@@ -52,7 +52,7 @@ pub(crate) fn repair(path: &Path) -> Result<(), Par2Error> {
 
     trace!("{:#?}", verified_set);
 
-    let mut job = RepairJob::new(&verified_set);
+    let mut job = RepairJob::new(&verified_set)?;
 
     job.run()?;
 
@@ -86,14 +86,17 @@ struct RepairPlan {
 }
 
 impl<'a> RepairJob<'a> {
-    pub(crate) fn new(verified_set: &'a Par2VerifiedSet) -> Self {
+    pub(crate) fn new(verified_set: &'a Par2VerifiedSet) -> Result<Self, Par2Error> {
         let calculator = GaloisFieldCalculator::new();
 
-        let total_input_slices: u16 = verified_set
+        let total_input_slices: u64 = verified_set
             .results
             .iter()
-            .map(|d| d.file_length.div_ceil(verified_set.slice_size) as u16)
+            .map(|d| d.file_length.div_ceil(verified_set.slice_size))
             .sum();
+
+        let total_input_slices: u16 = u16::try_from(total_input_slices)
+            .map_err(|_| Par2Error::RepairError("too many slices (max 65535)".into()))?;
 
         let slice_constants = build_slice_constants(&calculator, total_input_slices);
 
@@ -129,7 +132,7 @@ impl<'a> RepairJob<'a> {
         trace!("Missing indexes {:?}", missing_indexes);
         trace!("Valid indexes {:?}", valid_indexes);
 
-        Self {
+        Ok(Self {
             calculator,
             missing_indexes,
             recovery_buffers,
@@ -137,7 +140,7 @@ impl<'a> RepairJob<'a> {
             slices,
             valid_indexes,
             verified_set,
-        }
+        })
     }
 
     pub(crate) fn run(&mut self) -> Result<(), Par2Error> {
