@@ -175,7 +175,14 @@ pub(crate) fn parse_file(file_path: &std::path::Path) -> Result<Vec<Par2Packet>,
         );
 
         let body_offset = header_offset + PAR2_HEADER_SIZE;
-        let body_bytes = &file_data[body_offset..header_offset + packet_length];
+        let body_bytes = file_data
+            .get(body_offset..header_offset + packet_length)
+            .ok_or_else(|| {
+                Par2Error::ParseError(format!(
+                    "packet at offset {} extends past end of file",
+                    header_offset
+                ))
+            })?;
 
         let body = parse_body(&header.packet_type, body_bytes).map_err(|e| {
             Par2Error::ParseError(format!("invalid body at offset {}: {}", header_offset, e))
