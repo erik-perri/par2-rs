@@ -304,6 +304,10 @@ impl<'a> RepairJob<'a> {
                 diagonal = matrix[col][col];
             }
 
+            if diagonal == 0 {
+                return Err(Par2Error::RepairNotPossible);
+            }
+
             // Scale the matrix row
             for entry in 0..k {
                 matrix[col][entry] = self.calculator.divide(matrix[col][entry], diagonal)?;
