@@ -82,7 +82,6 @@ pub(crate) fn create(
             continue;
         }
 
-        let mut recovery_slices: Vec<Par2RecoverySliceData> = Vec::new();
         let mut block_number = 0u16;
         let slice_constants = build_slice_constants(&calculator, total_input_slices);
 
@@ -140,14 +139,10 @@ pub(crate) fn create(
                 recovery_bytes.write_u16::<LittleEndian>(item)?;
             }
 
-            recovery_slices.push(Par2RecoverySliceData {
+            let body = Par2PacketBody::RecoverySlice(Par2RecoverySliceData {
                 exponent: exponent as u32,
                 recovery_data: recovery_bytes,
-            })
-        }
-
-        for slice in recovery_slices {
-            let body = Par2PacketBody::RecoverySlice(slice);
+            });
             let body_bytes = body.to_bytes()?;
             let header = Par2PacketHeader::from_body(
                 &common.recovery_set_id,
